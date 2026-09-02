@@ -100,6 +100,7 @@ connection when opening the course for the first time.
 ## Main files
 
 - `app/turtle-course.tsx` — lessons, checks, editor, progress, and canvas
+- `app/python-editor.tsx` — shared editable Python syntax highlighting
 - `app/account.tsx` — magic-link UI and local-to-server progress synchronization
 - `public/python-worker.mjs` — Python runtime and browser Turtle adapter
 - `app/globals.css` — visual design and responsive layout

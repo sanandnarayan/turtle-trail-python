@@ -32,6 +32,7 @@ import {
   useAccount,
   useCourseProgressSync,
 } from "./account";
+import { PythonEditor } from "./python-editor";
 
 type TurtleLine = {
   type: "line";
@@ -609,6 +610,109 @@ type SavedProgress = CourseProgress;
 
 const STORAGE_KEY = "turtle-trail-progress-v1";
 
+const getGridStep = (scale: number) => {
+  const roughStep = 62 / scale;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  const multiplier = normalized < 1.5 ? 1 : normalized < 3.5 ? 2 : normalized < 7.5 ? 5 : 10;
+  return multiplier * magnitude;
+};
+
+const formatCoordinate = (value: number) =>
+  Math.abs(value) < 0.0001 ? "0" : Number(value.toFixed(4)).toString();
+
+const drawCoordinatePlane = (
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  originX: number,
+  originY: number,
+  scale: number,
+) => {
+  const majorStep = getGridStep(scale);
+  const minorStep = majorStep / 5;
+  const minX = -originX / scale;
+  const maxX = (width - originX) / scale;
+  const minY = (originY - height) / scale;
+  const maxY = originY / scale;
+
+  const drawGrid = (step: number, color: string, lineWidth: number) => {
+    context.beginPath();
+    for (let x = Math.ceil(minX / step) * step; x <= maxX; x += step) {
+      const canvasX = originX + x * scale;
+      context.moveTo(canvasX, 0);
+      context.lineTo(canvasX, height);
+    }
+    for (let y = Math.ceil(minY / step) * step; y <= maxY; y += step) {
+      const canvasY = originY - y * scale;
+      context.moveTo(0, canvasY);
+      context.lineTo(width, canvasY);
+    }
+    context.strokeStyle = color;
+    context.lineWidth = lineWidth;
+    context.stroke();
+  };
+
+  context.save();
+  drawGrid(minorStep, "rgba(0, 158, 73, 0.07)", 1);
+  drawGrid(majorStep, "rgba(0, 158, 73, 0.17)", 1);
+
+  context.beginPath();
+  context.moveTo(0, originY);
+  context.lineTo(width, originY);
+  context.moveTo(originX, 0);
+  context.lineTo(originX, height);
+  context.strokeStyle = "rgba(24, 91, 53, 0.48)";
+  context.lineWidth = 1.4;
+  context.stroke();
+
+  context.fillStyle = "#527060";
+  context.font = "600 10px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.textAlign = "center";
+  const xLabelsAbove = originY > height - 28;
+  context.textBaseline = xLabelsAbove ? "bottom" : "top";
+  for (let x = Math.ceil(minX / majorStep) * majorStep; x <= maxX; x += majorStep) {
+    if (Math.abs(x) < 0.0001) continue;
+    const canvasX = originX + x * scale;
+    context.fillText(formatCoordinate(x), canvasX, originY + (xLabelsAbove ? -14 : 14));
+  }
+
+  const yLabelsLeft = originX > width - 42;
+  context.textAlign = yLabelsLeft ? "right" : "left";
+  context.textBaseline = "middle";
+  for (let y = Math.ceil(minY / majorStep) * majorStep; y <= maxY; y += majorStep) {
+    if (Math.abs(y) < 0.0001) continue;
+    const canvasY = originY - y * scale;
+    context.fillText(formatCoordinate(y), originX + (yLabelsLeft ? -16 : 16), canvasY);
+  }
+
+  context.textAlign = "left";
+  context.textBaseline = "bottom";
+  context.fillText("0", originX + 6, originY - 5);
+  context.font = "800 11px ui-rounded, system-ui";
+  context.fillStyle = "#28613f";
+  context.fillText("x", width - 15, originY - 7);
+  context.fillText("y", originX + 8, 15);
+
+  const scaleLabel = `${formatCoordinate(minorStep)} units / small square`;
+  context.font = "700 10px ui-rounded, system-ui";
+  const labelWidth = context.measureText(scaleLabel).width + 16;
+  context.fillStyle = "rgba(255, 255, 255, 0.92)";
+  context.fillRect(width - labelWidth - 9, 8, labelWidth, 24);
+  context.strokeStyle = "rgba(0, 158, 73, 0.24)";
+  context.lineWidth = 1;
+  context.strokeRect(width - labelWidth - 9, 8, labelWidth, 24);
+  context.fillStyle = "#37634a";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(scaleLabel, width - labelWidth / 2 - 9, 20);
+
+  context.strokeStyle = "rgba(0, 158, 73, 0.3)";
+  context.lineWidth = 1;
+  context.strokeRect(0.5, 0.5, width - 1, height - 1);
+  context.restore();
+};
+
 function TurtleCanvas({
   commands,
   animationKey,
@@ -655,38 +759,14 @@ function TurtleCanvas({
       const height = canvas.clientHeight;
       const background = [...commands]
         .reverse()
-        .find((command): command is TurtleBackground => command.type === "bg")?.color ?? "#f7fbff";
+        .find((command): command is TurtleBackground => command.type === "bg")?.color ?? "#ffffff";
 
       context.clearRect(0, 0, width, height);
       context.fillStyle = background;
       context.fillRect(0, 0, width, height);
-      context.strokeStyle = "rgba(20, 50, 87, 0.075)";
-      context.lineWidth = 1;
-      for (let x = 20; x < width; x += 20) {
-        context.beginPath();
-        context.moveTo(x, 0);
-        context.lineTo(x, height);
-        context.stroke();
-      }
-      for (let y = 20; y < height; y += 20) {
-        context.beginPath();
-        context.moveTo(0, y);
-        context.lineTo(width, y);
-        context.stroke();
-      }
 
       const turtleMovedWithoutDrawing =
         turtleState !== null && (!isNear(turtleState.x, 0) || !isNear(turtleState.y, 0));
-      if (drawable.length === 0 && !turtleMovedWithoutDrawing) {
-        context.font = "34px system-ui";
-        context.textAlign = "center";
-        context.fillText("🐢", width / 2, height / 2 - 8);
-        context.font = "600 15px ui-rounded, system-ui";
-        context.fillStyle = "#66738b";
-        context.fillText("Run your code to make a trail", width / 2, height / 2 + 28);
-        return;
-      }
-
       const points = drawable.flatMap((command) => {
         if (command.type === "line") return [[command.x1, command.y1], [command.x2, command.y2]];
         return [[command.x, command.y]];
@@ -705,6 +785,19 @@ function TurtleCanvas({
       const originY = height / 2 + ((minY + maxY) / 2) * scale;
       const mapX = (x: number) => originX + x * scale;
       const mapY = (y: number) => originY - y * scale;
+
+      drawCoordinatePlane(context, width, height, originX, originY, scale);
+
+      if (drawable.length === 0 && !turtleMovedWithoutDrawing) {
+        context.font = "34px system-ui";
+        context.textAlign = "center";
+        context.fillText("🐢", width / 2, height / 2 - 8);
+        context.font = "600 15px ui-rounded, system-ui";
+        context.fillStyle = "#64716a";
+        context.fillText("Run your code to make a trail", width / 2, height / 2 + 28);
+        return;
+      }
+
       const progress = Math.min(1, (timestamp - startedAt) / duration);
       const visibleCount = progress * drawable.length;
       let turtleX = 0;
@@ -1142,23 +1235,14 @@ export function TurtleCourse() {
                 <div className="panel-title"><span className="traffic-lights" aria-hidden="true"><i /><i /><i /></span>lesson_{String(lesson.number).padStart(2, "0")}.py</div>
                 <Button type="button" variant="ghost" size="sm" className="reset-button" onClick={resetLesson} disabled={running}><RotateCcw /> Reset</Button>
               </div>
-              <div className="editor-wrap">
-                <div className="editor-gutter" aria-hidden="true">
-                  {code.split("\n").map((_, index) => <span key={index}>{index + 1}</span>)}
-                </div>
-                <textarea
-                  value={code}
-                  onChange={(event) => updateCode(event.target.value)}
-                  onKeyDown={handleEditorKeyDown}
-                  disabled={running}
-                  maxLength={20000}
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  aria-label={`Code editor for lesson ${lesson.number}`}
-                  aria-describedby="editor-keyboard-help"
-                />
-              </div>
+              <PythonEditor
+                value={code}
+                onChange={updateCode}
+                onKeyDown={handleEditorKeyDown}
+                disabled={running}
+                ariaLabel={`Code editor for lesson ${lesson.number}`}
+                ariaDescribedBy="editor-keyboard-help"
+              />
               <div className="editor-actions">
                 <span className="shortcut"><kbd>Ctrl/⌘</kbd><kbd>Enter</kbd> run · <kbd>Esc</kbd> leave editor</span>
                 <span id="editor-keyboard-help" className="sr-only">
@@ -1171,20 +1255,20 @@ export function TurtleCourse() {
             </section>
 
             <section className="output-panel" aria-label="Turtle output">
-              <div className="panel-bar"><div className="panel-title"><Turtle /> Turtle canvas</div><span className="canvas-status">{running ? "Drawing…" : "Live output"}</span></div>
-              <div className="canvas-wrap">
+              <div className="panel-bar"><div className="panel-title"><Turtle /> Turtle canvas</div><span className="canvas-status">{running ? "Drawing…" : "x / y coordinates"}</span></div>
+              <div className={`canvas-wrap turtle-canvas-wrap ${feedback ? "has-feedback" : ""}`}>
                 <TurtleCanvas
                   commands={result?.commands ?? []}
                   animationKey={animationKey}
                   turtleState={result?.state ?? null}
                 />
-                {feedback && (
-                  <div className={`feedback-card ${feedback.passed ? "passed" : "try-again"}`} role="status">
-                    <span className="feedback-icon">{feedback.passed ? <Check /> : <Lightbulb />}</span>
-                    <div><strong>{feedback.passed ? "Trail cleared!" : "Nearly there"}</strong><p>{feedback.passed ? lesson.success : feedback.message}</p></div>
-                  </div>
-                )}
               </div>
+              {feedback && (
+                <div className={`feedback-card turtle-feedback ${feedback.passed ? "passed" : "try-again"}`} role="status">
+                  <span className="feedback-icon">{feedback.passed ? <Check /> : <Lightbulb />}</span>
+                  <div><strong>{feedback.passed ? "Trail cleared!" : "Nearly there"}</strong><p>{feedback.passed ? lesson.success : feedback.message}</p></div>
+                </div>
+              )}
               {(result?.output || result?.error) && (
                 <div
                   className={`terminal-output ${result.error ? "has-error" : ""}`}

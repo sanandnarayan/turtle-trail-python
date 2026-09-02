@@ -34,6 +34,7 @@ import {
   useAccount,
   useCourseProgressSync,
 } from "../account";
+import { PythonEditor } from "../python-editor";
 
 type TurtleLine = {
   type: "line";
@@ -153,7 +154,7 @@ const hasHand = (
 const FACE_STARTER = `import turtle
 
 radius = 150
-turtle.bgcolor("#fffaf2")
+turtle.bgcolor("#ffffff")
 turtle.pencolor("${FACE_COLOR}")
 turtle.pensize(5)
 turtle.penup()
@@ -167,7 +168,7 @@ turtle.circle(80)`;
 const FACE_CODE = `import turtle
 
 radius = 150
-turtle.bgcolor("#fffaf2")
+turtle.bgcolor("#ffffff")
 turtle.pencolor("${FACE_COLOR}")
 turtle.pensize(5)
 turtle.penup()
@@ -699,7 +700,7 @@ function ClockCanvas({
       const height = bounds.height;
       const background = [...commands]
         .reverse()
-        .find((command): command is TurtleBackground => command.type === "bg")?.color ?? "#fffaf2";
+        .find((command): command is TurtleBackground => command.type === "bg")?.color ?? "#ffffff";
       const scale = Math.min((width - 58) / 340, (height - 58) / 340);
       const originX = width / 2;
       const originY = height / 2 - (width < 500 ? 18 : 0);
@@ -1258,23 +1259,15 @@ function ClockWorkshop() {
                 <div className="panel-title"><span className="traffic-lights" aria-hidden="true"><i /><i /><i /></span>clock_{String(lesson.number).padStart(2, "0")}.py</div>
                 <Button type="button" variant="ghost" size="sm" className="reset-button" onClick={resetLesson} disabled={running}><RotateCcw /> Reset</Button>
               </div>
-              <div className="editor-wrap clock-editor-wrap">
-                <div className="editor-gutter" aria-hidden="true">
-                  {code.split("\n").map((_, index) => <span key={index}>{index + 1}</span>)}
-                </div>
-                <textarea
-                  value={code}
-                  onChange={(event) => updateCode(event.target.value)}
-                  onKeyDown={handleEditorKeyDown}
-                  disabled={running}
-                  maxLength={20000}
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  aria-label={`Code editor for clock mission ${lesson.number}`}
-                  aria-describedby="clock-editor-keyboard-help"
-                />
-              </div>
+              <PythonEditor
+                value={code}
+                onChange={updateCode}
+                onKeyDown={handleEditorKeyDown}
+                disabled={running}
+                ariaLabel={`Code editor for clock mission ${lesson.number}`}
+                ariaDescribedBy="clock-editor-keyboard-help"
+                className="clock-editor-wrap"
+              />
               <div className="editor-actions">
                 <span className="shortcut"><kbd>Ctrl/⌘</kbd><kbd>Enter</kbd> run · <kbd>Esc</kbd> leave editor</span>
                 <span id="clock-editor-keyboard-help" className="sr-only">
@@ -1295,7 +1288,7 @@ function ClockWorkshop() {
                   <span className="canvas-status">Turtle output</span>
                 )}
               </div>
-              <div className={`canvas-wrap clock-canvas-wrap ${liveActive ? "is-live" : ""}`}>
+              <div className={`canvas-wrap clock-canvas-wrap ${liveActive ? "is-live" : ""} ${feedback ? "has-feedback" : ""}`}>
                 <ClockCanvas commands={result?.commands ?? []} animationKey={animationKey} />
                 {(second !== null || minute !== null || hour !== null) && (
                   <div className="clock-readout" aria-label="Python clock values">
@@ -1303,16 +1296,16 @@ function ClockWorkshop() {
                     <span>{formatClockPart(hour)}:{formatClockPart(minute)}:{formatClockPart(second)}</span>
                   </div>
                 )}
-                {feedback && (
-                  <div className={`feedback-card clock-feedback ${feedback.passed ? "passed" : "try-again"}`} role="status">
-                    <span className="feedback-icon">{feedback.passed ? <Check /> : <Lightbulb />}</span>
-                    <div>
-                      <strong>{feedback.passed ? `Mission cleared · +${lesson.points} tokens!` : "Almost in sync"}</strong>
-                      <p>{feedback.passed ? lesson.success : feedback.message}</p>
-                    </div>
-                  </div>
-                )}
               </div>
+              {feedback && (
+                <div className={`feedback-card clock-feedback ${feedback.passed ? "passed" : "try-again"}`} role="status">
+                  <span className="feedback-icon">{feedback.passed ? <Check /> : <Lightbulb />}</span>
+                  <div>
+                    <strong>{feedback.passed ? `Mission cleared · +${lesson.points} tokens!` : "Almost in sync"}</strong>
+                    <p>{feedback.passed ? lesson.success : feedback.message}</p>
+                  </div>
+                </div>
+              )}
               {(result?.output || result?.error) && (
                 <div className={`terminal-output ${result.error ? "has-error" : ""}`} role={result.error ? "alert" : "status"}>
                   <div className="terminal-label"><Terminal /> {result.error ? "Python message" : "Printed output"}</div>
