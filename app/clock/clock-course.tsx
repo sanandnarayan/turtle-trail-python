@@ -13,7 +13,6 @@ import {
   Sparkles,
   Terminal,
   Timer,
-  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -26,11 +25,13 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CourseVictory } from "@/components/course-victory";
 import { Progress } from "@/components/ui/progress";
 
 import {
   AccountControl,
   type CourseProgress,
+  useAccount,
   useCourseProgressSync,
 } from "../account";
 
@@ -664,6 +665,8 @@ type PendingRun = {
 };
 
 const STORAGE_KEY = "turtle-clock-quest-progress-v1";
+const TURTLE_STORAGE_KEY = "turtle-trail-progress-v1";
+const TURTLE_FINAL_LESSON_ID = "final-rosette";
 
 function ClockCanvas({
   commands,
@@ -765,7 +768,119 @@ const readClockPart = (result: RunResult | null, name: "hour" | "minute" | "seco
 const formatClockPart = (value: number | null) =>
   value === null ? "--" : String(value).padStart(2, "0");
 
+const hasCompletedTurtleCourse = (value: unknown) => {
+  if (!isRecord(value)) return false;
+  const progress = isRecord(value.progress) ? value.progress : value;
+  return (
+    Array.isArray(progress.completed) &&
+    progress.completed.includes(TURTLE_FINAL_LESSON_ID)
+  );
+};
+
 export function ClockCourse() {
+  const { user, sessionStatus } = useAccount();
+  const [accessStatus, setAccessStatus] = useState<"checking" | "locked" | "unlocked">("checking");
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    let localCourseComplete = false;
+    try {
+      const localProgress = localStorage.getItem(TURTLE_STORAGE_KEY);
+      localCourseComplete = Boolean(
+        localProgress && hasCompletedTurtleCourse(JSON.parse(localProgress) as unknown),
+      );
+    } catch {
+      localStorage.removeItem(TURTLE_STORAGE_KEY);
+    }
+
+    if (sessionStatus === "loading") {
+      const accessTimer = window.setTimeout(() => setAccessStatus("checking"), 0);
+      return () => window.clearTimeout(accessTimer);
+    }
+    if (!userId) {
+      const accessTimer = window.setTimeout(() => setAccessStatus("locked"), 0);
+      return () => window.clearTimeout(accessTimer);
+    }
+    if (localCourseComplete) {
+      const accessTimer = window.setTimeout(() => setAccessStatus("unlocked"), 0);
+      return () => window.clearTimeout(accessTimer);
+    }
+
+    const controller = new AbortController();
+    const accessTimer = window.setTimeout(() => setAccessStatus("checking"), 0);
+    void fetch("/api/progress/turtle-basics", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Progress could not be checked");
+        const body: unknown = await response.json();
+        setAccessStatus(hasCompletedTurtleCourse(body) ? "unlocked" : "locked");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setAccessStatus("locked");
+      });
+    return () => {
+      window.clearTimeout(accessTimer);
+      controller.abort();
+    };
+  }, [sessionStatus, userId]);
+
+  if (accessStatus === "unlocked") return <ClockWorkshop />;
+
+  return (
+    <main className="course-shell clock-course clock-access-shell">
+      <header className="course-header clock-access-header">
+        <div className="brand-lockup">
+          <span className="brand-mark clock-brand-mark" aria-hidden="true"><Clock3 /></span>
+          <div>
+            <p className="brand-name">Clock Quest</p>
+            <p className="brand-subtitle">Your next Python adventure</p>
+          </div>
+        </div>
+        <div className="header-actions">
+          <Link className="course-link" href="/"><ArrowLeft /> Back to Turtle Trail</Link>
+        </div>
+      </header>
+
+      <section className="clock-access-card" aria-live="polite">
+        <span className={`clock-access-icon ${accessStatus}`} aria-hidden="true">
+          {accessStatus === "checking" ? <Timer /> : <LockKeyhole />}
+        </span>
+        <p className="victory-eyebrow">
+          {accessStatus === "checking"
+            ? "Checking your trail…"
+            : user
+              ? "One adventure at a time"
+              : "Sign in required"}
+        </p>
+        <h1>
+          {accessStatus === "checking"
+            ? "Finding your Python wins"
+            : user
+              ? "Clock Quest is your next big quest"
+              : "Sign in to open Clock Quest"}
+        </h1>
+        <p>
+          {accessStatus === "checking"
+            ? "We’re checking whether your clock workshop is ready."
+            : user
+              ? "Finish all 12 Turtle Trail lessons first. Then this workshop will unlock and you’ll use your new Python powers to build a real live clock."
+              : "Return to Turtle Trail and sign in with your email. Clock Quest unlocks after you are signed in and finish all 12 lessons."}
+        </p>
+        {accessStatus === "locked" && (
+          <Link className="victory-action" href="/">
+            {user ? "Keep going on my trail" : "Sign in on Turtle Trail"} <span aria-hidden="true">→</span>
+          </Link>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function ClockWorkshop() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [unlocked, setUnlocked] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
@@ -778,6 +893,7 @@ export function ClockCourse() {
   const [visibleHints, setVisibleHints] = useState(0);
   const [animationKey, setAnimationKey] = useState(0);
   const [liveTick, setLiveTick] = useState(0);
+  const [victoryBurst, setVictoryBurst] = useState(0);
 
   const workerRef = useRef<Worker | null>(null);
   const workerGenerationRef = useRef(0);
@@ -900,6 +1016,9 @@ export function ClockCourse() {
       setFeedback(verdict);
 
       if (verdict.passed) {
+        if (pending.lessonIndex === CLOCK_LESSONS.length - 1) {
+          setVictoryBurst((burst) => burst + 1);
+        }
         setCompleted((previous) =>
           previous.includes(activeLesson.id) ? previous : [...previous, activeLesson.id],
         );
@@ -1215,14 +1334,22 @@ export function ClockCourse() {
               )}
             </div>
 
-            {feedback?.passed && (
-              currentIndex < CLOCK_LESSONS.length - 1 ? (
-                <Button type="button" size="lg" onClick={goNext} className="next-button clock-next-button">Next mission <ChevronRight /></Button>
-              ) : (
-                <div className="finish-badge clock-finish-badge"><Trophy /><div><strong>Master of Time</strong><small>{TOTAL_POINTS} tokens · live clock complete</small></div></div>
-              )
+            {feedback?.passed && currentIndex < CLOCK_LESSONS.length - 1 && (
+              <Button type="button" size="lg" onClick={goNext} className="next-button clock-next-button">Next mission <ChevronRight /></Button>
             )}
           </div>
+
+          {feedback?.passed && currentIndex === CLOCK_LESSONS.length - 1 && (
+            <CourseVictory
+              burstKey={victoryBurst}
+              eyebrow="Clock Quest complete!"
+              title="You’re a Master of Time!"
+              message="You turned functions, math, Turtle, and real time into a working clock. You didn’t just finish code—you built something amazing."
+              achievement={`${TOTAL_POINTS} time tokens earned`}
+              emoji="🕰️🏆"
+              tone="clock"
+            />
+          )}
 
           {completeCourse && currentIndex !== CLOCK_LESSONS.length - 1 && (
             <p className="course-complete-note">Clock Quest complete. Every mission is open for more experiments.</p>

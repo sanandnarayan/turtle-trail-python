@@ -5,7 +5,6 @@ import {
   ChevronRight,
   Circle,
   Clock3,
-  ExternalLink,
   Lightbulb,
   LockKeyhole,
   Play,
@@ -24,11 +23,13 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { CourseVictory } from "@/components/course-victory";
 import { Progress } from "@/components/ui/progress";
 
 import {
   AccountControl,
   type CourseProgress,
+  useAccount,
   useCourseProgressSync,
 } from "./account";
 
@@ -778,6 +779,7 @@ function TurtleCanvas({
 }
 
 export function TurtleCourse() {
+  const { user, sessionStatus } = useAccount();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [unlocked, setUnlocked] = useState(0);
   const [completed, setCompleted] = useState<string[]>([]);
@@ -789,6 +791,8 @@ export function TurtleCourse() {
   const [feedback, setFeedback] = useState<CheckResult | null>(null);
   const [visibleHints, setVisibleHints] = useState(0);
   const [animationKey, setAnimationKey] = useState(0);
+  const [savePromptRequest, setSavePromptRequest] = useState(0);
+  const [victoryBurst, setVictoryBurst] = useState(0);
 
   const workerRef = useRef<Worker | null>(null);
   const workerGenerationRef = useRef(0);
@@ -801,6 +805,8 @@ export function TurtleCourse() {
   const lesson = LESSONS[currentIndex];
   const code = drafts[lesson.id] ?? lesson.starter;
   const completedSet = useMemo(() => new Set(completed), [completed]);
+  const firstLessonComplete = completedSet.has(LESSONS[0].id);
+  const signInRequired = firstLessonComplete && sessionStatus !== "loading" && !user;
   const progress = Math.round((completed.length / LESSONS.length) * 100);
   const savedProgress = useMemo<CourseProgress>(
     () => ({ completed, unlocked, current: currentIndex, drafts }),
@@ -891,6 +897,12 @@ export function TurtleCourse() {
         setFeedback(verdict);
 
         if (verdict.passed) {
+          if (pendingLessonRef.current === 0) {
+            setSavePromptRequest((request) => request + 1);
+          }
+          if (pendingLessonRef.current === LESSONS.length - 1) {
+            setVictoryBurst((burst) => burst + 1);
+          }
           setCompleted((previous) =>
             previous.includes(activeLesson.id) ? previous : [...previous, activeLesson.id],
           );
@@ -961,8 +973,18 @@ export function TurtleCourse() {
     }
   }, [completed, currentIndex, drafts, hydrated, unlocked]);
 
+  useEffect(() => {
+    if (!hydrated || sessionStatus === "loading" || user || currentIndex === 0) return;
+    const returnToFirstLesson = window.setTimeout(() => {
+      setCurrentIndex(0);
+      setResult(null);
+      setFeedback(null);
+    }, 0);
+    return () => window.clearTimeout(returnToFirstLesson);
+  }, [currentIndex, hydrated, sessionStatus, user]);
+
   const chooseLesson = (index: number) => {
-    if (running || index > unlocked) return;
+    if (running || index > unlocked || (index > 0 && !user)) return;
     setCurrentIndex(index);
     setResult(null);
     setFeedback(null);
@@ -983,6 +1005,10 @@ export function TurtleCourse() {
 
   const runCode = useCallback(() => {
     if (!workerRef.current || runtimeStatus !== "ready" || runningRef.current) return;
+    if (currentIndex > 0 && !user) {
+      setSavePromptRequest((request) => request + 1);
+      return;
+    }
     if (code.length > 20000) {
       setFeedback({ passed: false, message: "That program is a little too long. Keep it under 20,000 characters." });
       return;
@@ -1002,7 +1028,7 @@ export function TurtleCourse() {
       setFeedback({ passed: false, message: "That ran for too long. Check whether a while loop can ever stop." });
       bootWorker();
     }, 5000);
-  }, [bootWorker, code, currentIndex, runtimeStatus]);
+  }, [bootWorker, code, currentIndex, runtimeStatus, user]);
 
   const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -1048,14 +1074,25 @@ export function TurtleCourse() {
         </div>
 
         <div className="header-actions">
-          <Link className="course-link clock-quest-link" href="/clock" target="_blank" rel="noreferrer">
-            <Clock3 /> Clock Quest <ExternalLink className="external-link-icon" />
-          </Link>
+          {completeCourse && user ? (
+            <Link className="course-link clock-quest-link" href="/clock">
+              <Clock3 /> Clock Quest
+            </Link>
+          ) : (
+            <span className="course-link clock-quest-link locked" aria-label="Clock Quest unlocks after all 12 Turtle Trail lessons">
+              <LockKeyhole /> Clock Quest
+            </span>
+          )}
           <div className={`runtime-pill ${runtimeStatus}`} role="status" aria-live="polite">
             <span className="status-dot" />
             {runtimeStatus === "ready" ? "Python ready" : runtimeStatus === "loading" ? "Warming up Python…" : "Python needs a refresh"}
           </div>
-          <AccountControl returnTo="/" syncStatus={syncStatus} />
+          <AccountControl
+            returnTo="/"
+            syncStatus={syncStatus}
+            celebrateFirstLesson={signInRequired}
+            openRequest={savePromptRequest}
+          />
         </div>
       </header>
 
@@ -1066,12 +1103,13 @@ export function TurtleCourse() {
             {LESSONS.map((item, index) => {
               const isCurrent = index === currentIndex;
               const isComplete = completedSet.has(item.id);
-              const isLocked = index > unlocked;
+              const isSignInLocked = index > 0 && !user;
+              const isLocked = index > unlocked || isSignInLocked;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`lesson-link ${isCurrent ? "current" : ""} ${isComplete ? "complete" : ""}`}
+                  className={`lesson-link ${isCurrent ? "current" : ""} ${isComplete ? "complete" : ""} ${index === 1 && isSignInLocked ? "sign-in-gate" : ""}`}
                   onClick={() => chooseLesson(index)}
                   disabled={isLocked || running}
                   aria-current={isCurrent ? "step" : undefined}
@@ -1079,7 +1117,11 @@ export function TurtleCourse() {
                   <span className="lesson-state" aria-hidden="true">
                     {isComplete ? <Check /> : isLocked ? <LockKeyhole /> : <Circle />}
                   </span>
-                  <span><span className="lesson-number">Lesson {item.number}</span><span className="lesson-title">{item.title}</span></span>
+                  <span>
+                    <span className="lesson-number">Lesson {item.number}</span>
+                    <span className="lesson-title">{item.title}</span>
+                    {index === 1 && isSignInLocked && <span className="lesson-lock-reason">Sign in to unlock</span>}
+                  </span>
                 </button>
               );
             })}
@@ -1168,17 +1210,36 @@ export function TurtleCourse() {
               )}
             </div>
 
-            {feedback?.passed && (
-              currentIndex < LESSONS.length - 1 ? (
-                <Button type="button" size="lg" onClick={goNext} className="next-button">Next lesson <ChevronRight /></Button>
+            {feedback?.passed && currentIndex < LESSONS.length - 1 && (
+              currentIndex === 0 && !user ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={() => setSavePromptRequest((request) => request + 1)}
+                  className="next-button next-button-locked"
+                >
+                  <LockKeyhole /> Sign in to unlock lesson 2
+                </Button>
               ) : (
-                <div className="finish-badge"><span>★</span><div><strong>Python Trailblazer</strong><small>All 12 lessons complete</small></div></div>
+                <Button type="button" size="lg" onClick={goNext} className="next-button">Next lesson <ChevronRight /></Button>
               )
             )}
           </div>
 
+          {feedback?.passed && currentIndex === LESSONS.length - 1 && (
+            <CourseVictory
+              burstKey={victoryBurst}
+              eyebrow="Trail complete!"
+              title="You’re a Python Trailblazer!"
+              message="You kept trying, solved every challenge, and built a colorful program with real Python. That is something to be very proud of."
+              achievement="12 lessons conquered"
+              emoji="🐢🏆"
+              action={{ href: "/clock", label: "Build my live clock" }}
+            />
+          )}
+
           {completeCourse && currentIndex !== LESSONS.length - 1 && (
-            <p className="course-complete-note">You completed Turtle Trail. Every lesson is now open for experimenting.</p>
+            <p className="course-complete-note">You completed Turtle Trail. Every lesson is open for experimenting, and Clock Quest is unlocked!</p>
           )}
         </section>
       </div>

@@ -316,6 +316,10 @@ textarea {
   cursor: not-allowed;
 }
 
+.lesson-link.sign-in-gate {
+  opacity: 0.78;
+}
+
 .lesson-state {
   width: 25px;
   height: 25px;
@@ -358,6 +362,14 @@ textarea {
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lesson-lock-reason {
+  margin-top: 3px;
+  display: block;
+  color: #ffd56a;
+  font-size: 0.65rem;
+  font-weight: 850;
 }
 
 .lesson-workspace {
@@ -593,6 +605,13 @@ textarea {
   background: #80ea99;
 }
 
+.next-button-locked,
+.next-button-locked:hover {
+  color: #352203;
+  background: linear-gradient(135deg, #ffe27b, #ffbd42);
+  box-shadow: 0 8px 18px rgba(255, 185, 50, 0.2);
+}
+
 .canvas-status {
   color: #738098;
   font-size: 0.72rem;
@@ -762,36 +781,156 @@ textarea {
   flex: 0 0 auto;
 }
 
-.finish-badge {
-  padding: 9px 14px;
-  display: flex;
+.course-victory {
+  margin: 2px 0 18px;
+  padding: 24px;
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  border: 1px solid rgba(255, 211, 92, 0.42);
+  border-radius: 22px;
+  color: #fff8d8;
+  background:
+    radial-gradient(circle at 8% 10%, rgba(255, 220, 110, 0.2), transparent 12rem),
+    linear-gradient(135deg, #44330b, #17243d 68%);
+  box-shadow: 0 20px 46px rgba(2, 8, 22, 0.3);
+  animation: victory-arrive 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.victory-emoji {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 225, 135, 0.34);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  font-size: 2rem;
+}
+
+.victory-copy,
+.victory-copy p,
+.victory-copy h2 {
+  margin: 0;
+}
+
+.victory-copy h2 {
+  margin-top: 3px;
+  color: #fff;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.victory-copy > p:not(.victory-eyebrow) {
+  max-width: 720px;
+  margin-top: 8px;
+  color: #d7e0ef;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.victory-eyebrow {
+  color: #ffd767;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.victory-achievement {
+  margin-top: 10px;
+  display: inline-flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid #d4b445;
-  border-radius: 14px;
-  color: #fff5c8;
-  background: linear-gradient(135deg, #4f3a09, #2d290f);
-  box-shadow: 0 12px 30px rgba(255, 203, 69, 0.13);
+  color: #fff0aa;
+  font-size: 0.76rem;
 }
 
-.finish-badge > span {
+.victory-achievement span {
   color: #ffcf4e;
-  font-size: 1.7rem;
+  letter-spacing: 0.12em;
 }
 
-.finish-badge strong,
-.finish-badge small {
-  display: block;
+.victory-action {
+  min-height: 46px;
+  padding: 11px 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #f0b936;
+  border-radius: 13px;
+  color: #342203;
+  background: linear-gradient(135deg, #ffe27b, #ffbd42);
+  box-shadow: 0 10px 24px rgba(255, 185, 50, 0.2);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
-.finish-badge strong {
-  font-size: 0.85rem;
+.victory-action:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 14px 30px rgba(255, 185, 50, 0.28);
 }
 
-.finish-badge small {
-  margin-top: 2px;
-  color: #d9cc9d;
-  font-size: 0.68rem;
+.victory-action:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.confetti-burst {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  width: 11px;
+  height: 18px;
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  border-radius: 3px;
+  opacity: 0;
+  background: #ffcf4e;
+  animation: confetti-pop 1.8s cubic-bezier(0.12, 0.62, 0.3, 1) var(--confetti-delay) forwards;
+}
+
+.confetti-piece-1 {
+  border-radius: 50%;
+  background: #66e58b;
+}
+
+.confetti-piece-2 {
+  width: 16px;
+  height: 9px;
+  background: #3cc8ef;
+}
+
+.confetti-piece-3 {
+  background: #ff6e85;
+}
+
+.confetti-piece-4 {
+  width: 9px;
+  height: 15px;
+  border-radius: 50%;
+  background: #a883ff;
+}
+
+.confetti-piece-5 {
+  width: 15px;
+  height: 8px;
+  background: #ff9e3d;
 }
 
 .course-complete-note {
@@ -846,12 +985,6 @@ textarea {
 .course-link svg {
   width: 15px;
   height: 15px;
-}
-
-.course-link .external-link-icon {
-  width: 12px;
-  height: 12px;
-  opacity: 0.62;
 }
 
 .account-button {
@@ -950,6 +1083,12 @@ textarea {
 .account-dialog-icon.synced {
   color: #5a38ad;
   background: #e9e0ff;
+}
+
+.account-dialog-icon.first-win {
+  color: #805309;
+  background: linear-gradient(145deg, #fff2a9, #ffd466);
+  box-shadow: 0 9px 22px rgba(218, 155, 25, 0.2);
 }
 
 .account-dialog-icon svg {
@@ -1128,6 +1267,16 @@ textarea {
 .clock-quest-link:hover {
   border-color: rgba(255, 202, 69, 0.7);
   background: rgba(130, 88, 8, 0.52);
+}
+
+.clock-quest-link.locked,
+.clock-quest-link.locked:hover {
+  border-style: dashed;
+  border-color: rgba(184, 194, 213, 0.28);
+  color: #8998af;
+  background: rgba(24, 36, 58, 0.58);
+  cursor: not-allowed;
+  transform: none;
 }
 
 .clock-course {
@@ -1367,16 +1516,78 @@ textarea {
   z-index: 4;
 }
 
-.clock-finish-badge {
-  border-color: #8c6ae1;
+.course-victory.clock {
+  border-color: rgba(176, 142, 255, 0.46);
   color: #efe8ff;
-  background: linear-gradient(135deg, #463285, #2c2453);
+  background:
+    radial-gradient(circle at 8% 10%, rgba(255, 214, 106, 0.2), transparent 12rem),
+    linear-gradient(135deg, #463285, #222c4a 70%);
 }
 
-.clock-finish-badge > svg {
-  width: 28px;
-  height: 28px;
-  color: #ffd76a;
+.clock-access-shell {
+  min-height: 100svh;
+}
+
+.clock-access-header {
+  grid-template-columns: 1fr auto;
+}
+
+.clock-access-card {
+  width: min(620px, calc(100% - 32px));
+  margin: clamp(54px, 11vh, 110px) auto;
+  padding: clamp(28px, 5vw, 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid rgba(255, 211, 106, 0.24);
+  border-radius: 28px;
+  color: #e9edf7;
+  background: rgba(14, 25, 47, 0.86);
+  box-shadow: 0 28px 70px rgba(2, 7, 19, 0.3);
+  text-align: center;
+}
+
+.clock-access-icon {
+  width: 70px;
+  height: 70px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  color: #614212;
+  background: linear-gradient(145deg, #ffe787, #ffb743);
+  box-shadow: 0 12px 28px rgba(255, 185, 67, 0.18);
+}
+
+.clock-access-icon.checking svg {
+  animation: clock-access-pulse 1.4s ease-in-out infinite;
+}
+
+.clock-access-icon svg {
+  width: 30px;
+  height: 30px;
+}
+
+.clock-access-card .victory-eyebrow {
+  margin: 22px 0 7px;
+}
+
+.clock-access-card h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.8rem, 5vw, 2.65rem);
+  line-height: 1.08;
+  letter-spacing: -0.045em;
+}
+
+.clock-access-card > p:not(.victory-eyebrow) {
+  max-width: 500px;
+  margin: 14px 0 0;
+  color: #b8c4d8;
+  line-height: 1.65;
+}
+
+.clock-access-card .victory-action {
+  margin-top: 25px;
 }
 
 @keyframes clock-live-dot {
@@ -1415,6 +1626,44 @@ textarea {
   }
 }
 
+@keyframes victory-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confetti-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2) rotate(0);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(-50% + var(--confetti-x)),
+      calc(-50% + var(--confetti-y) + 16vh)
+    ) rotate(var(--confetti-spin));
+  }
+}
+
+@keyframes clock-access-pulse {
+  0%,
+  100% {
+    transform: rotate(-8deg) scale(0.94);
+  }
+  50% {
+    transform: rotate(8deg) scale(1.06);
+  }
+}
+
 @keyframes account-spin {
   to {
     transform: rotate(360deg);
@@ -1431,6 +1680,16 @@ textarea {
   from {
     opacity: 0;
     transform: translateY(8px) scale(0.98);
+  }
+}
+
+@media (max-width: 1350px) and (min-width: 1121px) {
+  .course-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .header-progress {
+    display: none;
   }
 }
 
@@ -1579,12 +1838,32 @@ textarea {
     flex-direction: column;
   }
 
+  .course-victory {
+    grid-template-columns: auto 1fr;
+    padding: 20px;
+  }
+
+  .victory-emoji {
+    width: 62px;
+    height: 62px;
+    font-size: 1.6rem;
+  }
+
+  .victory-action {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
   .next-button {
     width: 100%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .confetti-burst {
+    display: none;
+  }
+
   *,
   *::before,
   *::after {

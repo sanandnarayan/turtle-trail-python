@@ -8,6 +8,7 @@ import {
   LogOut,
   Mail,
   Save,
+  Sparkles,
   X,
 } from "lucide-react";
 import {
@@ -131,17 +132,17 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;
 }
 
-const useAccount = () => {
+export const useAccount = () => {
   const account = useContext(AccountContext);
   if (!account) throw new Error("useAccount must be used inside AccountProvider");
   return account;
 };
 
 const syncCopy: Record<ProgressSyncStatus, string> = {
-  local: "Stored on this device",
+  local: "Autosaved on this device",
   loading: "Loading saved work…",
-  saving: "Saving answers…",
-  saved: "Saved to your account",
+  saving: "Autosaving answers…",
+  saved: "All changes autosaved",
   error: "Cloud sync paused",
 };
 
@@ -157,9 +158,13 @@ const SyncIcon = ({ status }: { status: ProgressSyncStatus }) => {
 export function AccountControl({
   returnTo,
   syncStatus,
+  celebrateFirstLesson = false,
+  openRequest = 0,
 }: {
   returnTo: "/" | "/clock";
   syncStatus: ProgressSyncStatus;
+  celebrateFirstLesson?: boolean;
+  openRequest?: number;
 }) {
   const { user, sessionStatus, signOut } = useAccount();
   const [open, setOpen] = useState(false);
@@ -170,6 +175,7 @@ export function AccountControl({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
+  const handledOpenRequestRef = useRef(0);
 
   const closeDialog = useCallback(() => {
     setOpen(false);
@@ -177,6 +183,20 @@ export function AccountControl({
     setSent(false);
     window.setTimeout(() => triggerRef.current?.focus(), 0);
   }, []);
+
+  useEffect(() => {
+    if (
+      openRequest <= handledOpenRequestRef.current ||
+      sessionStatus === "loading"
+    ) {
+      return;
+    }
+    const promptTimer = window.setTimeout(() => {
+      handledOpenRequestRef.current = openRequest;
+      if (!user) setOpen(true);
+    }, 0);
+    return () => window.clearTimeout(promptTimer);
+  }, [openRequest, sessionStatus, user]);
 
   useEffect(() => {
     if (!open) return;
@@ -240,10 +260,10 @@ export function AccountControl({
         className={`course-link account-button ${user ? "signed-in" : ""}`}
         onClick={() => setOpen(true)}
         disabled={sessionStatus === "loading"}
-        aria-label={user ? `Account for ${user.email}. ${syncCopy[syncStatus]}` : "Sign in to save progress"}
+        aria-label={user ? `Account for ${user.email}. ${syncCopy[syncStatus]}` : celebrateFirstLesson ? "Sign in to continue to lesson 2" : "Progress is autosaved on this device. Sign in for cloud sync"}
       >
         {user ? <Cloud aria-hidden="true" /> : <Save aria-hidden="true" />}
-        <span>{sessionStatus === "loading" ? "Checking…" : user ? "Synced" : "Save progress"}</span>
+        <span>{sessionStatus === "loading" ? "Checking…" : user ? "Synced" : celebrateFirstLesson ? "Sign in to continue" : "Autosave on"}</span>
       </button>
 
       {open && createPortal(
@@ -265,7 +285,7 @@ export function AccountControl({
                 <p className="account-eyebrow">Progress account</p>
                 <h2 id="account-dialog-title">Your Python work is safe</h2>
                 <p className="account-description">
-                  Lesson answers and progress sync whenever they change.
+                  Lesson answers and progress autosave whenever they change.
                 </p>
                 <div className="account-email">{user.email}</div>
                 <div className={`account-sync-state ${syncStatus}`} role="status">
@@ -279,7 +299,7 @@ export function AccountControl({
             ) : sent ? (
               <>
                 <span className="account-dialog-icon sent"><Mail /></span>
-                <p className="account-eyebrow">Almost there</p>
+                <p className="account-eyebrow">{celebrateFirstLesson ? "Great teamwork!" : "Almost there"}</p>
                 <h2 id="account-dialog-title">Check your email</h2>
                 <p className="account-description">
                   Open the one-time link sent to <strong>{email}</strong>. It expires in 15 minutes.
@@ -289,11 +309,19 @@ export function AccountControl({
               </>
             ) : (
               <>
-                <span className="account-dialog-icon"><Save /></span>
-                <p className="account-eyebrow">Free progress sync</p>
-                <h2 id="account-dialog-title">Save every Python answer</h2>
+                <span className={`account-dialog-icon ${celebrateFirstLesson ? "first-win" : ""}`}>
+                  {celebrateFirstLesson ? <Sparkles /> : <Save />}
+                </span>
+                <p className="account-eyebrow">
+                  {celebrateFirstLesson ? "First lesson complete!" : "Free progress sync"}
+                </p>
+                <h2 id="account-dialog-title">
+                  {celebrateFirstLesson ? "Brilliant start—save your trail" : "Save every Python answer"}
+                </h2>
                 <p className="account-description">
-                  Enter an email and we’ll send a one-time sign-in link. No password needed.
+                  {celebrateFirstLesson
+                    ? "Enter your email to keep your Python wins safe. We’ll send one sign-in link—no password needed."
+                    : "Enter an email and we’ll send a one-time sign-in link. No password needed."}
                 </p>
                 <form className="account-form" onSubmit={requestLink}>
                   <label htmlFor="account-email">Email address</label>
@@ -311,11 +339,13 @@ export function AccountControl({
                   />
                   {error && <p className="account-error" role="alert">{error}</p>}
                   <button type="submit" className="account-primary-button" disabled={sending}>
-                    {sending ? <><LoaderCircle className="account-spinner" /> Sending…</> : <><Mail /> Email my sign-in link</>}
+                    {sending
+                      ? <><LoaderCircle className="account-spinner" /> Sending…</>
+                      : <><Mail /> {celebrateFirstLesson ? "Save my Python trail" : "Email my sign-in link"}</>}
                   </button>
                 </form>
                 <p className="account-local-note">
-                  Your current device progress will be merged after sign-in. We use your email only for login and progress sync.
+                  Your work is already autosaved on this device. Lesson 2 unlocks after you open the email link and sign in.
                 </p>
               </>
             )}

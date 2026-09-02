@@ -8,10 +8,11 @@ The course includes 12 progressive lessons covering imports, arguments,
 variables, `for` and `while` loops, conditions, functions, parameters, lists,
 and modules. Progress and unfinished code are stored locally in the browser.
 
-The separate **Clock Quest** course at `/clock` adds nine graded missions for
-building a live analog clock with Turtle. Learners draw the face and hour
-numbers, add each hand, connect them to `datetime`, refactor repeated drawing
-steps into a function, and earn persistent points as they progress.
+The separate **Clock Quest** course at `/clock` unlocks after all 12 Turtle
+Trail lessons and adds nine graded missions for building a live analog clock
+with Turtle. Learners draw the face and hour numbers, add each hand, connect
+them to `datetime`, refactor repeated drawing steps into a function, and earn
+persistent points as they progress.
 
 Learners can use the courses anonymously with browser-local progress or sign in
 through an emailed one-time link. Signed-in lesson answers, unlocks, and scores
