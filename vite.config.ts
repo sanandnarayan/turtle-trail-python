@@ -6,7 +6,10 @@ const workerConfig = {
   main: "./worker/index.ts",
   compatibility_date: "2026-09-02",
   compatibility_flags: ["nodejs_compat"],
-  routes: [{ pattern: "python.codeanand.com", custom_domain: true }],
+  routes: [
+    { pattern: "python.codeanand.com", custom_domain: true },
+    { pattern: "pyforkids.com", custom_domain: true },
+  ],
   d1_databases: [
     {
       binding: "DB",
