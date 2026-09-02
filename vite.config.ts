@@ -9,6 +9,7 @@ const workerConfig = {
   routes: [
     { pattern: "python.codeanand.com", custom_domain: true },
     { pattern: "pyforkids.com", custom_domain: true },
+    { pattern: "www.pyforkids.com", custom_domain: true },
   ],
   d1_databases: [
     {

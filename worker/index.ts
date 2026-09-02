@@ -30,6 +30,12 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.hostname === "www.pyforkids.com") {
+      url.protocol = "https:";
+      url.hostname = "pyforkids.com";
+      return Response.redirect(url.toString(), 301);
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return handleApiRequest(request, env, ctx);
     }
