@@ -201,6 +201,7 @@ textarea {
 
 .runtime-pill {
   justify-self: end;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -211,6 +212,7 @@ textarea {
   background: #0b1830;
   font-size: 0.78rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .status-dot {
@@ -805,6 +807,10 @@ textarea {
   gap: 10px;
 }
 
+.header-actions > * {
+  flex-shrink: 0;
+}
+
 .course-link {
   min-height: 38px;
   padding: 8px 11px;
@@ -846,6 +852,271 @@ textarea {
   width: 12px;
   height: 12px;
   opacity: 0.62;
+}
+
+.account-button {
+  appearance: none;
+  cursor: pointer;
+}
+
+.account-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.account-button.signed-in {
+  border-color: rgba(98, 220, 131, 0.4);
+  color: #c8f8d4;
+  background: rgba(30, 104, 57, 0.34);
+}
+
+.account-button.signed-in:hover {
+  border-color: rgba(98, 220, 131, 0.68);
+  background: rgba(35, 128, 67, 0.44);
+}
+
+.account-dialog-backdrop {
+  padding: 20px;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 10, 24, 0.72);
+  backdrop-filter: blur(9px);
+  animation: account-backdrop-in 150ms ease-out;
+}
+
+.account-dialog {
+  width: min(440px, 100%);
+  padding: 34px;
+  position: relative;
+  border: 1px solid #dce5f4;
+  border-radius: 24px;
+  color: #17243d;
+  background: #fff;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.34);
+  animation: account-dialog-in 180ms ease-out;
+}
+
+.account-dialog-close {
+  width: 36px;
+  height: 36px;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #5e6b82;
+  background: #eef3fa;
+  cursor: pointer;
+}
+
+.account-dialog-close:hover {
+  color: #17243d;
+  background: #e3eaf5;
+}
+
+.account-dialog-close:focus-visible,
+.account-primary-button:focus-visible,
+.account-secondary-button:focus-visible,
+.account-form input:focus-visible {
+  outline: 3px solid rgba(43, 166, 85, 0.32);
+  outline-offset: 2px;
+}
+
+.account-dialog-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.account-dialog-icon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  color: #20643a;
+  background: #daf5e3;
+}
+
+.account-dialog-icon.sent {
+  color: #235a93;
+  background: #dceeff;
+}
+
+.account-dialog-icon.synced {
+  color: #5a38ad;
+  background: #e9e0ff;
+}
+
+.account-dialog-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.account-eyebrow {
+  margin: 22px 0 7px;
+  color: #2b8b4b;
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.account-dialog h2 {
+  margin: 0;
+  color: #17243d;
+  font-size: 1.65rem;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.account-description {
+  margin: 12px 0 0;
+  color: #65728a;
+  font-size: 0.93rem;
+  line-height: 1.6;
+}
+
+.account-description strong {
+  color: #263653;
+  overflow-wrap: anywhere;
+}
+
+.account-form {
+  margin-top: 23px;
+  display: grid;
+  gap: 9px;
+}
+
+.account-form label {
+  color: #34425b;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.account-form input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #cad6e7;
+  border-radius: 12px;
+  color: #17243d;
+  background: #fbfdff;
+  font: inherit;
+}
+
+.account-form input::placeholder {
+  color: #98a5b8;
+}
+
+.account-primary-button,
+.account-secondary-button {
+  min-height: 46px;
+  padding: 11px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.account-primary-button {
+  margin-top: 7px;
+  border: 1px solid #23763f;
+  color: #fff;
+  background: linear-gradient(135deg, #2fa858, #247a43);
+  box-shadow: 0 9px 22px rgba(37, 126, 69, 0.2);
+}
+
+.account-primary-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #38b963, #29894b);
+}
+
+.account-primary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.account-primary-button svg,
+.account-secondary-button svg,
+.account-sync-state svg {
+  width: 17px;
+  height: 17px;
+}
+
+.account-secondary-button {
+  width: 100%;
+  margin-top: 18px;
+  border: 1px solid #d5deeb;
+  color: #43516a;
+  background: #f6f8fc;
+}
+
+.account-secondary-button:hover {
+  color: #922f3e;
+  border-color: #efc8cf;
+  background: #fff5f6;
+}
+
+.account-error {
+  margin: 1px 0 0;
+  color: #a12e3f;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.account-local-note {
+  margin: 17px 0 0;
+  color: #68758a;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.account-email {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid #dce5f1;
+  border-radius: 11px;
+  color: #34425b;
+  background: #f7f9fc;
+  font-size: 0.84rem;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.account-sync-state {
+  margin-top: 11px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  color: #486276;
+  background: #eef5f8;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.account-sync-state.saved {
+  color: #24683d;
+  background: #e7f7ec;
+}
+
+.account-sync-state.error {
+  color: #8d3b47;
+  background: #fff0f2;
+}
+
+.account-spinner {
+  animation: account-spin 0.9s linear infinite;
 }
 
 .clock-quest-link {
@@ -893,6 +1164,18 @@ textarea {
 .clock-course .lesson-link.current {
   background: linear-gradient(135deg, #302b4f, #253657);
   box-shadow: inset 3px 0 0 #ffc857;
+}
+
+.clock-course .lesson-link {
+  min-height: 72px;
+}
+
+.clock-course .lesson-title {
+  display: -webkit-box;
+  line-height: 1.25;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .clock-course .lesson-link.complete .lesson-state {
@@ -1132,7 +1415,34 @@ textarea {
   }
 }
 
+@keyframes account-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes account-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes account-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
 @media (max-width: 1120px) {
+  .course-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .header-progress {
+    display: none;
+  }
+
   .course-layout {
     grid-template-columns: 1fr;
     padding-top: 20px;
@@ -1166,10 +1476,6 @@ textarea {
     padding: 12px 18px;
   }
 
-  .header-progress {
-    display: none;
-  }
-
   .practice-grid {
     grid-template-columns: 1fr;
   }
@@ -1197,8 +1503,17 @@ textarea {
 
   .header-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .account-dialog-backdrop {
+    padding: 12px;
+  }
+
+  .account-dialog {
+    padding: 28px 22px 24px;
+    border-radius: 20px;
   }
 
   .brand-subtitle {

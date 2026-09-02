@@ -13,6 +13,11 @@ building a live analog clock with Turtle. Learners draw the face and hour
 numbers, add each hand, connect them to `datetime`, refactor repeated drawing
 steps into a function, and earn persistent points as they progress.
 
+Learners can use the courses anonymously with browser-local progress or sign in
+through an emailed one-time link. Signed-in lesson answers, unlocks, and scores
+are synchronized to Cloudflare D1 and merged with existing progress when a
+learner signs in on a new device.
+
 ## Requirements
 
 - Node.js 22.13 or newer
@@ -42,6 +47,33 @@ Then build and deploy:
 npm run deploy
 ```
 
+### Progress accounts
+
+The Worker uses the `turtle-trail-progress` D1 database configured in
+`vite.config.ts`. Build first, then apply database migrations before the first
+deployment:
+
+```bash
+npm run build
+npx wrangler d1 migrations apply turtle-trail-progress --remote \
+  --config dist/server/wrangler.json
+```
+
+Email sign-in uses [Resend](https://resend.com). Verify the sending domain in
+Resend, then configure these Worker secrets without committing their values:
+
+```bash
+npx wrangler secret put RESEND_API_KEY --config dist/server/wrangler.json
+npx wrangler secret put RESEND_FROM_EMAIL --config dist/server/wrangler.json
+```
+
+`RESEND_FROM_EMAIL` accepts a verified sender such as
+`Turtle Trail <learn@resend.codeanand.com>`. For local Wrangler development, put the
+same names in an ignored `.dev.vars` file.
+
+Magic links expire after 15 minutes, can only be used once, and are stored as
+SHA-256 hashes. Sessions use secure, HTTP-only cookies and expire after 30 days.
+
 Wrangler prints the final `workers.dev` URL. You can attach a custom domain
 from **Cloudflare Dashboard → Workers & Pages → turtle-trail-python →
 Settings → Domains & Routes**.
@@ -67,9 +99,12 @@ connection when opening the course for the first time.
 ## Main files
 
 - `app/turtle-course.tsx` — lessons, checks, editor, progress, and canvas
+- `app/account.tsx` — magic-link UI and local-to-server progress synchronization
 - `public/python-worker.mjs` — Python runtime and browser Turtle adapter
 - `app/globals.css` — visual design and responsive layout
-- `worker/index.ts` — Cloudflare Worker entry point
+- `worker/api.ts` — authentication, session, and D1 progress API
+- `worker/index.ts` — Cloudflare Worker entry point and API routing
+- `migrations/` — D1 authentication and progress schema
 
 ## Useful commands
 

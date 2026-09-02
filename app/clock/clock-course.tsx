@@ -28,6 +28,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
+import {
+  AccountControl,
+  type CourseProgress,
+  useCourseProgressSync,
+} from "../account";
+
 type TurtleLine = {
   type: "line";
   x1: number;
@@ -649,12 +655,7 @@ const isRunResultMessage = (
   );
 };
 
-type SavedProgress = {
-  completed: string[];
-  unlocked: number;
-  current: number;
-  drafts: Record<string, string>;
-};
+type SavedProgress = CourseProgress;
 
 type PendingRun = {
   mode: "lesson" | "live";
@@ -796,6 +797,33 @@ export function ClockCourse() {
     [completedSet],
   );
   const progress = Math.round((score / TOTAL_POINTS) * 100);
+  const savedProgress = useMemo<CourseProgress>(
+    () => ({ completed, unlocked, current: currentIndex, drafts }),
+    [completed, currentIndex, drafts, unlocked],
+  );
+  const mergeRemoteProgress = useCallback((remote: CourseProgress) => {
+    const lessonIds = new Set(CLOCK_LESSONS.map((item) => item.id));
+    const remoteCompleted = remote.completed.filter((id) => lessonIds.has(id));
+    const remoteUnlocked = Math.max(0, Math.min(remote.unlocked, CLOCK_LESSONS.length - 1));
+    const remoteCurrent = Math.max(0, Math.min(remote.current, remoteUnlocked));
+    const remoteDrafts: Record<string, string> = {};
+    Object.entries(remote.drafts).forEach(([id, draft]) => {
+      if (lessonIds.has(id)) remoteDrafts[id] = draft.slice(0, 20000);
+    });
+    setCompleted((previous) => {
+      const merged = new Set([...remoteCompleted, ...previous]);
+      return CLOCK_LESSONS.map((item) => item.id).filter((id) => merged.has(id));
+    });
+    setUnlocked((previous) => Math.max(previous, remoteUnlocked));
+    setCurrentIndex((previous) => Math.max(previous, remoteCurrent));
+    setDrafts((previous) => ({ ...remoteDrafts, ...previous }));
+  }, []);
+  const syncStatus = useCourseProgressSync({
+    course: "clock-quest",
+    hydrated,
+    progress: savedProgress,
+    mergeRemoteProgress,
+  });
   const liveActive = Boolean(feedback?.passed && lesson.live);
   const hour = readClockPart(result, "hour");
   const minute = readClockPart(result, "minute");
@@ -1054,6 +1082,7 @@ export function ClockCourse() {
             <span className="status-dot" />
             {runtimeStatus === "ready" ? "Python ready" : runtimeStatus === "loading" ? "Warming up Python…" : "Python needs a refresh"}
           </div>
+          <AccountControl returnTo="/clock" syncStatus={syncStatus} />
         </div>
       </header>
 

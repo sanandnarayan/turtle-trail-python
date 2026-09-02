@@ -26,6 +26,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
+import {
+  AccountControl,
+  type CourseProgress,
+  useCourseProgressSync,
+} from "./account";
+
 type TurtleLine = {
   type: "line";
   x1: number;
@@ -598,12 +604,7 @@ const isRunResultMessage = (
   );
 };
 
-type SavedProgress = {
-  completed: string[];
-  unlocked: number;
-  current: number;
-  drafts: Record<string, string>;
-};
+type SavedProgress = CourseProgress;
 
 const STORAGE_KEY = "turtle-trail-progress-v1";
 
@@ -801,6 +802,33 @@ export function TurtleCourse() {
   const code = drafts[lesson.id] ?? lesson.starter;
   const completedSet = useMemo(() => new Set(completed), [completed]);
   const progress = Math.round((completed.length / LESSONS.length) * 100);
+  const savedProgress = useMemo<CourseProgress>(
+    () => ({ completed, unlocked, current: currentIndex, drafts }),
+    [completed, currentIndex, drafts, unlocked],
+  );
+  const mergeRemoteProgress = useCallback((remote: CourseProgress) => {
+    const lessonIds = new Set(LESSONS.map((item) => item.id));
+    const remoteCompleted = remote.completed.filter((id) => lessonIds.has(id));
+    const remoteUnlocked = Math.max(0, Math.min(remote.unlocked, LESSONS.length - 1));
+    const remoteCurrent = Math.max(0, Math.min(remote.current, remoteUnlocked));
+    const remoteDrafts: Record<string, string> = {};
+    Object.entries(remote.drafts).forEach(([id, draft]) => {
+      if (lessonIds.has(id)) remoteDrafts[id] = draft.slice(0, 20000);
+    });
+    setCompleted((previous) => {
+      const merged = new Set([...remoteCompleted, ...previous]);
+      return LESSONS.map((item) => item.id).filter((id) => merged.has(id));
+    });
+    setUnlocked((previous) => Math.max(previous, remoteUnlocked));
+    setCurrentIndex((previous) => Math.max(previous, remoteCurrent));
+    setDrafts((previous) => ({ ...remoteDrafts, ...previous }));
+  }, []);
+  const syncStatus = useCourseProgressSync({
+    course: "turtle-basics",
+    hydrated,
+    progress: savedProgress,
+    mergeRemoteProgress,
+  });
 
   const bootWorker = useCallback(() => {
     const generation = workerGenerationRef.current + 1;
@@ -1027,6 +1055,7 @@ export function TurtleCourse() {
             <span className="status-dot" />
             {runtimeStatus === "ready" ? "Python ready" : runtimeStatus === "loading" ? "Warming up Python…" : "Python needs a refresh"}
           </div>
+          <AccountControl returnTo="/" syncStatus={syncStatus} />
         </div>
       </header>
 
