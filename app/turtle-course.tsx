@@ -4,6 +4,8 @@ import {
   Check,
   ChevronRight,
   Circle,
+  Clock3,
+  ExternalLink,
   Lightbulb,
   LockKeyhole,
   Play,
@@ -11,6 +13,7 @@ import {
   Terminal,
   Turtle,
 } from "lucide-react";
+import Link from "next/link";
 import {
   type KeyboardEvent,
   useCallback,
@@ -1016,9 +1019,14 @@ export function TurtleCourse() {
           <Progress value={progress} className="course-progress" />
         </div>
 
-        <div className={`runtime-pill ${runtimeStatus}`} role="status" aria-live="polite">
-          <span className="status-dot" />
-          {runtimeStatus === "ready" ? "Python ready" : runtimeStatus === "loading" ? "Warming up Python…" : "Python needs a refresh"}
+        <div className="header-actions">
+          <Link className="course-link clock-quest-link" href="/clock" target="_blank" rel="noreferrer">
+            <Clock3 /> Clock Quest <ExternalLink className="external-link-icon" />
+          </Link>
+          <div className={`runtime-pill ${runtimeStatus}`} role="status" aria-live="polite">
+            <span className="status-dot" />
+            {runtimeStatus === "ready" ? "Python ready" : runtimeStatus === "loading" ? "Warming up Python…" : "Python needs a refresh"}
+          </div>
         </div>
       </header>
 

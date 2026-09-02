@@ -797,6 +797,330 @@ textarea {
   font-size: 0.84rem;
 }
 
+.header-actions {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.course-link {
+  min-height: 38px;
+  padding: 8px 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #31486c;
+  border-radius: 999px;
+  color: #e6eefb;
+  background: #10203a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.course-link:hover {
+  border-color: #5b749c;
+  background: #172d4e;
+  transform: translateY(-1px);
+}
+
+.course-link:focus-visible {
+  outline: 3px solid #77e58f;
+  outline-offset: 2px;
+}
+
+.course-link svg {
+  width: 15px;
+  height: 15px;
+}
+
+.course-link .external-link-icon {
+  width: 12px;
+  height: 12px;
+  opacity: 0.62;
+}
+
+.clock-quest-link {
+  border-color: rgba(255, 202, 69, 0.36);
+  color: #ffecb5;
+  background: rgba(105, 73, 8, 0.38);
+}
+
+.clock-quest-link:hover {
+  border-color: rgba(255, 202, 69, 0.7);
+  background: rgba(130, 88, 8, 0.52);
+}
+
+.clock-course {
+  background:
+    radial-gradient(circle at 78% 6%, rgba(255, 184, 77, 0.16), transparent 30rem),
+    radial-gradient(circle at 8% 42%, rgba(124, 58, 237, 0.13), transparent 34rem);
+}
+
+.clock-course .course-header {
+  border-bottom-color: rgba(255, 202, 69, 0.15);
+  background: rgba(10, 17, 35, 0.9);
+}
+
+.clock-brand-mark {
+  background: linear-gradient(145deg, #ffd76a, #ffad42);
+  color: #432403;
+  box-shadow: 0 9px 25px rgba(255, 183, 72, 0.25);
+}
+
+.clock-course .course-progress > div {
+  background: linear-gradient(90deg, #ffaf45, #ffe07a);
+}
+
+.clock-course .lesson-kicker,
+.clock-course .mission-label {
+  color: #ffd465;
+}
+
+.clock-course .mission-card {
+  border-color: rgba(255, 202, 69, 0.28);
+  background: rgba(255, 190, 72, 0.09);
+}
+
+.clock-course .lesson-link.current {
+  background: linear-gradient(135deg, #302b4f, #253657);
+  box-shadow: inset 3px 0 0 #ffc857;
+}
+
+.clock-course .lesson-link.complete .lesson-state {
+  border-color: #f0bd42;
+  color: #412500;
+  background: #ffd263;
+}
+
+.clock-course .lesson-link:hover:not(:disabled) {
+  background: #292d4c;
+}
+
+.clock-rail .lesson-link {
+  min-height: 68px;
+}
+
+.clock-intro {
+  max-width: none;
+}
+
+.clock-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: start;
+}
+
+.clock-title-row h1,
+.clock-title-row p {
+  margin: 0;
+}
+
+.clock-title-row h1 {
+  color: #fff;
+  font-size: clamp(2rem, 3vw, 3.1rem);
+  line-height: 1.03;
+  letter-spacing: -0.045em;
+}
+
+.clock-title-row p {
+  max-width: 780px;
+  margin-top: 12px;
+  color: #bdc9da;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.points-card {
+  min-width: 118px;
+  padding: 13px 15px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 7px;
+  align-items: center;
+  border: 1px solid rgba(255, 207, 90, 0.32);
+  border-radius: 17px;
+  color: #fff1c6;
+  background: linear-gradient(145deg, rgba(92, 60, 9, 0.66), rgba(48, 41, 22, 0.72));
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+}
+
+.points-card svg {
+  width: 20px;
+  height: 20px;
+  grid-row: 1 / 3;
+  color: #ffd15b;
+}
+
+.points-card strong,
+.points-card span {
+  display: block;
+}
+
+.points-card strong {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.points-card span {
+  margin-top: 3px;
+  color: #d9c38c;
+  font-size: 0.65rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clock-practice-grid {
+  grid-template-columns: minmax(440px, 1.05fr) minmax(420px, 0.95fr);
+}
+
+.clock-course .code-panel,
+.clock-course .output-panel {
+  min-height: 560px;
+}
+
+.clock-editor-wrap,
+.clock-editor-wrap textarea {
+  min-height: 432px;
+}
+
+.clock-run-button,
+.clock-next-button {
+  background: linear-gradient(135deg, #ffd35f, #ffb247);
+  color: #382000;
+  box-shadow: 0 8px 18px rgba(255, 177, 66, 0.23);
+}
+
+.clock-run-button:hover,
+.clock-next-button:hover {
+  background: linear-gradient(135deg, #ffe082, #ffc365);
+}
+
+.clock-canvas-wrap {
+  min-height: 510px;
+  overflow: hidden;
+  background: #fffaf2;
+}
+
+.clock-canvas-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 13px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px dashed rgba(82, 69, 53, 0.12);
+  border-radius: 18px;
+}
+
+.clock-canvas-wrap.is-live::before {
+  border-color: rgba(255, 93, 115, 0.22);
+  animation: clock-live-glow 2s ease-in-out infinite;
+}
+
+.clock-canvas {
+  width: 100%;
+  height: 510px;
+  min-height: 510px;
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.live-clock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #9e3146;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.live-clock-badge > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5d73;
+  box-shadow: 0 0 0 4px rgba(255, 93, 115, 0.14);
+  animation: clock-live-dot 1s ease-out infinite;
+}
+
+.clock-readout {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 3;
+  padding: 8px 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(67, 57, 42, 0.13);
+  border-radius: 11px;
+  color: #34303a;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 8px 18px rgba(67, 50, 24, 0.08);
+  backdrop-filter: blur(7px);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.clock-readout svg {
+  width: 15px;
+  height: 15px;
+  color: #7c3aed;
+}
+
+.clock-feedback {
+  z-index: 4;
+}
+
+.clock-finish-badge {
+  border-color: #8c6ae1;
+  color: #efe8ff;
+  background: linear-gradient(135deg, #463285, #2c2453);
+}
+
+.clock-finish-badge > svg {
+  width: 28px;
+  height: 28px;
+  color: #ffd76a;
+}
+
+@keyframes clock-live-dot {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+}
+
+@keyframes clock-live-glow {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 rgba(255, 93, 115, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 28px rgba(255, 93, 115, 0.06);
+  }
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -850,6 +1174,10 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .clock-practice-grid {
+    grid-template-columns: 1fr;
+  }
+
   .code-panel,
   .output-panel {
     min-height: 440px;
@@ -862,8 +1190,15 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .runtime-pill {
+  .runtime-pill,
+  .header-actions {
     justify-self: start;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .brand-subtitle {
@@ -884,6 +1219,18 @@ textarea {
     font-size: 2rem;
   }
 
+  .clock-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .clock-title-row h1 {
+    font-size: 2rem;
+  }
+
+  .points-card {
+    width: fit-content;
+  }
+
   .mission-card {
     display: grid;
     gap: 4px;
@@ -892,6 +1239,17 @@ textarea {
   .code-panel,
   .output-panel {
     border-radius: 16px;
+  }
+
+  .clock-course .code-panel,
+  .clock-course .output-panel {
+    min-height: 480px;
+  }
+
+  .clock-canvas-wrap,
+  .clock-canvas {
+    height: 430px;
+    min-height: 430px;
   }
 
   .shortcut {

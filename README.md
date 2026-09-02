@@ -8,6 +8,11 @@ The course includes 12 progressive lessons covering imports, arguments,
 variables, `for` and `while` loops, conditions, functions, parameters, lists,
 and modules. Progress and unfinished code are stored locally in the browser.
 
+The separate **Clock Quest** course at `/clock` adds nine graded missions for
+building a live analog clock with Turtle. Learners draw the face and hour
+numbers, add each hand, connect them to `datetime`, refactor repeated drawing
+steps into a function, and earn persistent points as they progress.
+
 ## Requirements
 
 - Node.js 22.13 or newer

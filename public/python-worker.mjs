@@ -408,7 +408,7 @@ for _key, _value in _student_globals.items():
     elif callable(_value):
         if len(_function_names) < 200:
             _function_names.append(_key[:120])
-    elif _key in {"distance", "steps", "colors", "size"}:
+    elif _key in {"distance", "steps", "colors", "size", "radius", "second", "minute", "hour"}:
         _converted = _safe_value(_value)
         if _converted is not _UNSAFE:
             _safe_globals[_key] = _converted
