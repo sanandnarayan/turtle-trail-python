@@ -80,7 +80,28 @@ type FunctionDefAnalysis = {
   calls: string[];
 };
 
-type RunResult = {
+type TraceValue = null | string | number | boolean | TraceValue[];
+
+type CallSiteAnalysis = {
+  id: number;
+  name: string;
+  scope: string | null;
+  assignedNames: string[];
+  argumentNames: string[][];
+  argumentCalls: Array<number | null>;
+};
+
+type ExecutedCallAnalysis = {
+  id: number;
+  site: number;
+  name: string | null;
+  module: string | null;
+  arguments: TraceValue[];
+  argumentSources: Array<number | null>;
+  resultSource: number | null;
+};
+
+export type RunResult = {
   commands: TurtleCommand[];
   output: string;
   error: string | null;
@@ -90,6 +111,8 @@ type RunResult = {
   syntax: string[];
   analysis: {
     calls: string[];
+    callSites: CallSiteAnalysis[];
+    executedCalls: ExecutedCallAnalysis[];
     forLoops: ForLoopAnalysis[];
     functionDefs: FunctionDefAnalysis[];
   };
@@ -127,7 +150,7 @@ type ShapeVariant = {
   mission: string;
   answer: string;
   sides: number;
-  distance: number;
+  distance?: number;
   turn: number;
 };
 
@@ -138,7 +161,7 @@ type CustomVariant = {
   answer: string;
 };
 
-type ChallengeVariant = MoveVariant | PrintVariant | ShapeVariant | CustomVariant;
+export type ChallengeVariant = MoveVariant | PrintVariant | ShapeVariant | CustomVariant;
 
 type LessonQuestion = {
   eyebrow: string;
@@ -223,13 +246,15 @@ const angleDistance = (first: number, second: number) => {
 const isRegularClosedShape = (
   lines: TurtleLine[],
   sides: number,
-  expectedLength: number,
+  expectedLength: number | undefined,
   expectedTurn: number,
 ) => {
+  const sideLength = expectedLength ?? (lines[0] ? lineLength(lines[0]) : 0);
   if (
     lines.length !== sides ||
     !isClosed(lines) ||
-    !lines.every((line) => isNear(lineLength(line), expectedLength))
+    sideLength <= 0 ||
+    !lines.every((line) => isNear(lineLength(line), sideLength))
   ) {
     return false;
   }
@@ -253,6 +278,85 @@ const callMatches = (actual: string, expected: string) =>
 
 const callCount = (result: RunResult, name: string) =>
   result.analysis.calls.filter((call) => callMatches(call, name)).length;
+
+const isExact = (first: number, second: number) =>
+  Math.abs(first - second) <= 0.000001;
+
+const executedCalls = (result: RunResult, name: string, module?: string) =>
+  result.analysis.executedCalls.filter(
+    (call) => call.name === name && (module === undefined || call.module === module),
+  );
+
+const callSite = (result: RunResult, id: number) =>
+  result.analysis.callSites.find((site) => site.id === id);
+
+const callResultFlowsTo = (
+  result: RunResult,
+  source: number | null,
+  producer: number,
+) => {
+  const visited = new Set<number>();
+  let current = source;
+  while (current !== null && !visited.has(current)) {
+    if (current === producer) return true;
+    visited.add(current);
+    current = result.analysis.executedCalls.find((call) => call.id === current)?.resultSource ?? null;
+  }
+  return false;
+};
+
+const callResultFlowsIntoArgument = (
+  result: RunResult,
+  producer: ExecutedCallAnalysis,
+  consumer: ExecutedCallAnalysis,
+  argumentIndex: number,
+) => {
+  if (!callResultFlowsTo(result, consumer.argumentSources[argumentIndex] ?? null, producer.id)) {
+    return false;
+  }
+  const producerSite = callSite(result, producer.site);
+  const consumerSite = callSite(result, consumer.site);
+  return consumerSite?.argumentCalls[argumentIndex] === producer.site ||
+    Boolean(producerSite?.assignedNames.some((name) =>
+      consumerSite?.argumentNames[argumentIndex]?.includes(name),
+    ));
+};
+
+const MOVEMENT_CALLS = new Set([
+  "forward",
+  "backward",
+  "goto",
+  "setpos",
+  "setposition",
+  "setx",
+  "sety",
+  "home",
+  "circle",
+]);
+
+const hasExactForwardTrail = (result: RunResult, distance: number) => {
+  const movements = result.analysis.executedCalls.filter(
+    (call) => call.name !== null && MOVEMENT_CALLS.has(call.name),
+  );
+  const lines = lineCommands(result);
+  return movements.length > 0 &&
+    movements.every(
+      (call) =>
+        call.name === "forward" &&
+        typeof call.arguments[0] === "number" &&
+        call.arguments[0] > 0,
+    ) &&
+    lines.length === movements.length &&
+    isExact(
+      movements.reduce((total, call) => total + (call.arguments[0] as number), 0),
+      distance,
+    ) &&
+    lines.every(
+      (line) => isExact(line.y1, 0) && isExact(line.y2, 0) && line.x2 > line.x1,
+    ) &&
+    isExact(result.state.x, distance) &&
+    isExact(result.state.y, 0);
+};
 
 const hasRangeLoop = (
   result: RunResult,
@@ -408,7 +512,7 @@ const checkShapeChallenge = (
   if (!variant || variant.kind !== "shape") {
     return { passed: false, message: "Reset this challenge and try again." };
   }
-  if (!result.syntax.includes("For") || !hasRangeLoop(result, variant.sides, ["forward", "right"])) {
+  if (!result.syntax.includes("For") || !hasForLoopCalls(result, ["forward", "right"])) {
     return { passed: false, message: "Put both forward( ) and right( ) inside one for loop." };
   }
   if (callCount(result, "forward") !== 1 || callCount(result, "right") !== 1) {
@@ -416,10 +520,15 @@ const checkShapeChallenge = (
   }
   return isRegularClosedShape(lineCommands(result), variant.sides, variant.distance, variant.turn)
     ? { passed: true, message: "One repeated block drew the whole shape." }
-    : { passed: false, message: "The loop is there. Check its repeats, distance, and turn angle." };
+    : {
+      passed: false,
+      message: variant.distance === undefined
+        ? "The loop is there. Check its repeats and turn angle, and keep every side equal."
+        : "The loop is there. Check its repeats, distance, and turn angle.",
+    };
 };
 
-const LESSONS: Lesson[] = [
+export const LESSONS: Lesson[] = [
   {
     id: "meet-turtle",
     number: 1,
@@ -437,8 +546,7 @@ turtle.forward(100)`,
     ],
     success: "You imported a module and called your first Turtle command.",
     check: (result) => {
-      const lines = lineCommands(result);
-      return lines.length === 1 && lineLength(lines[0]) >= 95 && result.modules.includes("turtle")
+      return hasExactForwardTrail(result, 100) && result.modules.includes("turtle")
         ? { passed: true, message: "Your turtle is awake!" }
         : { passed: false, message: "Keep both original lines, then run them together." };
     },
@@ -460,8 +568,7 @@ turtle.forward(40)`,
     ],
     success: "You passed a number into a function.",
     check: (result) => {
-      const lines = lineCommands(result);
-      return lines.length === 1 && isNear(lineLength(lines[0]), 120)
+      return hasExactForwardTrail(result, 120)
         ? { passed: true, message: "Exactly 120 steps!" }
         : { passed: false, message: "The trail needs to be exactly 120 steps long." };
     },
@@ -487,8 +594,19 @@ turtle.forward(distance)`,
     success: "One variable controlled two different movements.",
     check: (result) => {
       const lines = lineCommands(result);
-      const rightLengths = lines.length === 2 && lines.every((line) => isNear(lineLength(line), 100));
-      return result.globals.distance === 100 && rightLengths
+      const forwards = executedCalls(result, "forward");
+      const distancePoweredMoves = forwards.length === 2 && forwards.every((call) =>
+        call.arguments[0] === 100 &&
+        callSite(result, call.site)?.argumentNames[0]?.includes("distance"),
+      );
+      const movements = result.analysis.executedCalls.filter(
+        (call) => call.name !== null && MOVEMENT_CALLS.has(call.name),
+      );
+      const rightLengths = lines.length === 2 && lines.every((line) => isExact(lineLength(line), 100));
+      return result.globals.distance === 100 &&
+        movements.length === forwards.length &&
+        distancePoweredMoves &&
+        rightLengths
         ? { passed: true, message: "Your variable powered both sides!" }
         : { passed: false, message: "Store 100 in distance and keep using its name twice." };
     },
@@ -673,7 +791,6 @@ forward(50)`,
     forward(80)
     right(90)`,
         sides: 4,
-        distance: 80,
         turn: 90,
       },
       {
@@ -1546,12 +1663,11 @@ def draw_triangle():
       "Add draw_triangle() on the final line.",
     ],
     success: "You defined a function and then called it.",
-    check: (result, code) => {
+    check: (result) => {
       const lines = lineCommands(result);
-      const calledAtTopLevel = /(?:^|\n)draw_triangle\s*\(\s*\)\s*(?:#.*)?(?=\n|$)/.test(code);
       return (
         result.functions.includes("draw_triangle") &&
-        calledAtTopLevel &&
+        executedCalls(result, "draw_triangle").length > 0 &&
         isRegularClosedShape(lines, 3, 90, 120)
       )
         ? { passed: true, message: "Python remembered your new triangle command." }
@@ -1814,12 +1930,22 @@ draw_square(40)`,
       "Change the final call to draw_square(110).",
     ],
     success: "Your argument flowed into the function through a parameter.",
-    check: (result, code) => {
+    check: (result) => {
       const lines = lineCommands(result);
-      const usesParameter = /turtle\.forward\(\s*size\s*\)/.test(code);
-      const passesArgument = /(?:^|\n)draw_square\s*\(\s*110\s*\)/.test(code);
+      const drawCalls = executedCalls(result, "draw_square");
+      const forwardCalls = executedCalls(result, "forward");
+      const usesParameter = forwardCalls.length === 4 && forwardCalls.every((call) => {
+        const site = callSite(result, call.site);
+        return site?.scope === "draw_square" &&
+          site.argumentNames[0]?.includes("size") &&
+          call.arguments[0] === 110;
+      });
+      const passesArgument = drawCalls.length === 1 && drawCalls[0].arguments[0] === 110;
       const largeSquare = isRegularClosedShape(lines, 4, 110, 90);
-      return result.functions.includes("draw_square") && usesParameter && passesArgument && largeSquare
+      return hasFunctionDefinition(result, "draw_square", ["size"], []) &&
+        usesParameter &&
+        passesArgument &&
+        largeSquare
         ? { passed: true, message: "One parameter resized the entire square." }
         : { passed: false, message: "Pass 110 into draw_square on the final line." };
     },
@@ -2392,18 +2518,23 @@ print(math.sqrt(144))`,
 print(math.sqrt(225))`,
       },
     ],
-    check: (result, code, variant) => {
+    check: (result, _code, variant) => {
       const fresh = customKey(variant) === "module-math-fresh";
       const expected = fresh ? "15.0" : "12.0";
-      const argument = fresh ? "225" : "144";
-      const nestedCall = new RegExp(`print\\s*\\(\\s*math\\.sqrt\\s*\\(\\s*${argument}\\s*\\)\\s*\\)`).test(code);
+      const argument = fresh ? 225 : 144;
+      const sqrtCalls = executedCalls(result, "sqrt", "math").filter(
+        (call) => call.arguments[0] === argument,
+      );
+      const printedSqrtResult = sqrtCalls.length === 1 && executedCalls(result, "print", "builtins").some(
+        (call) => callResultFlowsIntoArgument(result, sqrtCalls[0], call, 0),
+      );
       return result.modules.includes("math") &&
         callCount(result, "math.sqrt") === 1 &&
         callCount(result, "print") === 1 &&
-        nestedCall &&
+        printedSqrtResult &&
         result.output.trim() === expected
         ? { passed: true, message: "Your imported math function produced the answer." }
-        : { passed: false, message: "Import math and print the requested math.sqrt( ) call itself." };
+        : { passed: false, message: "Import math and print the result of the requested math.sqrt( ) call." };
     },
   },
   {
@@ -2442,17 +2573,27 @@ random.seed(9)
 print(random.choice(["fox", "owl", "turtle"]))`,
       },
     ],
-    check: (result, code, variant) => {
+    check: (result, _code, variant) => {
       const fresh = customKey(variant) === "module-random-fresh";
       const choices = fresh ? ["fox", "owl", "turtle"] : ["sun", "moon", "star"];
-      const seed = fresh ? "9" : "4";
-      const nestedChoice = /print\s*\(\s*random\.choice\s*\(/.test(code);
-      const usesSeed = new RegExp(`random\\.seed\\s*\\(\\s*${seed}\\s*\\)`).test(code);
+      const seed = fresh ? 9 : 4;
+      const choiceCalls = executedCalls(result, "choice", "random").filter((call) =>
+        Array.isArray(call.arguments[0]) &&
+        call.arguments[0].length === choices.length &&
+        call.arguments[0].every((choice, index) => choice === choices[index]),
+      );
+      const printedChoiceResult = choiceCalls.length === 1 &&
+        executedCalls(result, "print", "builtins").some(
+          (call) => callResultFlowsIntoArgument(result, choiceCalls[0], call, 0),
+        );
+      const usesSeed = executedCalls(result, "seed", "random").some(
+        (call) => call.arguments[0] === seed,
+      );
       return result.modules.includes("random") &&
         result.syntax.includes("List") &&
         callCount(result, "random.choice") === 1 &&
         callCount(result, "print") === 1 &&
-        nestedChoice &&
+        printedChoiceResult &&
         usesSeed &&
         choices.includes(result.output.trim())
         ? { passed: true, message: "Your imported function selected and printed one list item." }
@@ -2502,12 +2643,21 @@ for side in range(sides):
     right(turn)`,
       },
     ],
-    check: (result, code, variant) => {
+    check: (result, _code, variant) => {
       const fresh = customKey(variant) === "module-boss-fresh";
       const sides = fresh ? 6 : 5;
       const distance = fresh ? 50 : 60;
       const turn = 360 / sides;
-      const usesCalculation = /math\.degrees\s*\([^\n]*math\.pi[^\n]*\/[^\n]*sides[^\n]*\)/.test(code);
+      const degreeCalls = executedCalls(result, "degrees", "math");
+      const rightCalls = executedCalls(result, "right");
+      const usesCalculation = degreeCalls.length === 1 &&
+        rightCalls.length === sides &&
+        rightCalls.every(
+          (call) =>
+            typeof call.arguments[0] === "number" &&
+            isExact(call.arguments[0], turn) &&
+            callResultFlowsTo(result, call.argumentSources[0] ?? null, degreeCalls[0].id),
+        );
       return result.modules.includes("math") &&
         callCount(result, "math.degrees") === 1 &&
         result.syntax.includes("For") &&
@@ -2869,6 +3019,51 @@ const isFunctionDefAnalysis = (value: unknown): value is FunctionDefAnalysis =>
   isStringArray(value.parameters, 20) &&
   isStringArray(value.calls, 100);
 
+const isTraceValue = (value: unknown, depth = 0): value is TraceValue => {
+  if (value === null || typeof value === "boolean" || isFiniteNumber(value)) return true;
+  if (typeof value === "string") return value.length <= 1000;
+  return depth < 3 &&
+    Array.isArray(value) &&
+    value.length <= 50 &&
+    value.every((item) => isTraceValue(item, depth + 1));
+};
+
+const isCallSiteAnalysis = (value: unknown): value is CallSiteAnalysis =>
+  isRecord(value) &&
+  Number.isInteger(value.id) &&
+  (value.id as number) >= 0 &&
+  typeof value.name === "string" &&
+  value.name.length <= 120 &&
+  (value.scope === null || (typeof value.scope === "string" && value.scope.length <= 120)) &&
+  isStringArray(value.assignedNames, 20) &&
+  Array.isArray(value.argumentNames) &&
+  value.argumentNames.length <= 20 &&
+  value.argumentNames.every((names) => isStringArray(names, 20)) &&
+  Array.isArray(value.argumentCalls) &&
+  value.argumentCalls.length <= 20 &&
+  value.argumentCalls.every(
+    (id) => id === null || (Number.isInteger(id) && (id as number) >= 0),
+  );
+
+const isExecutedCallAnalysis = (value: unknown): value is ExecutedCallAnalysis =>
+  isRecord(value) &&
+  Number.isInteger(value.id) &&
+  (value.id as number) >= 0 &&
+  Number.isInteger(value.site) &&
+  (value.site as number) >= 0 &&
+  (value.name === null || (typeof value.name === "string" && value.name.length <= 120)) &&
+  (value.module === null || (typeof value.module === "string" && value.module.length <= 120)) &&
+  Array.isArray(value.arguments) &&
+  value.arguments.length <= 20 &&
+  value.arguments.every(isTraceValue) &&
+  Array.isArray(value.argumentSources) &&
+  value.argumentSources.length <= 20 &&
+  value.argumentSources.every(
+    (id) => id === null || (Number.isInteger(id) && (id as number) >= 0),
+  ) &&
+  (value.resultSource === null ||
+    (Number.isInteger(value.resultSource) && (value.resultSource as number) >= 0));
+
 const isTurtleCommand = (value: unknown): value is TurtleCommand => {
   if (!isRecord(value) || typeof value.type !== "string") return false;
   if (value.type === "bg") {
@@ -2924,6 +3119,12 @@ const isRunResultMessage = (value: unknown): value is RunResultMessage => {
     !isStringArray(value.syntax) ||
     !isRecord(value.analysis) ||
     !isStringArray(value.analysis.calls, 500) ||
+    !Array.isArray(value.analysis.callSites) ||
+    value.analysis.callSites.length > 500 ||
+    !value.analysis.callSites.every(isCallSiteAnalysis) ||
+    !Array.isArray(value.analysis.executedCalls) ||
+    value.analysis.executedCalls.length > 2500 ||
+    !value.analysis.executedCalls.every(isExecutedCallAnalysis) ||
     !Array.isArray(value.analysis.forLoops) ||
     value.analysis.forLoops.length > 100 ||
     !value.analysis.forLoops.every(isForLoopAnalysis) ||

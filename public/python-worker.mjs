@@ -331,7 +331,7 @@ const errorResult = (id, error) => ({
   functions: [],
   modules: [],
   syntax: [],
-  analysis: { calls: [], forLoops: [], functionDefs: [] },
+  analysis: { calls: [], callSites: [], executedCalls: [], forLoops: [], functionDefs: [] },
   state: { x: 0, y: 0, heading: 0, color: "#173f5f", width: 4 },
 });
 
@@ -368,7 +368,15 @@ _student_globals = {
 _stdout = _LimitedWriter(_OUTPUT_LIMIT)
 _error = None
 _syntax_names = []
-_analysis = {"calls": [], "forLoops": [], "functionDefs": []}
+_analysis = {
+    "calls": [],
+    "callSites": [],
+    "executedCalls": [],
+    "forLoops": [],
+    "functionDefs": [],
+}
+_tracked_results = []
+_TRACE_UNSAFE = object()
 
 def _call_name(node):
     if isinstance(node, ast.Name):
@@ -389,14 +397,137 @@ def _literal_value(node):
         return node.value[:120]
     return None
 
+def _trace_value(value, depth=0):
+    if depth > 2:
+        return _TRACE_UNSAFE
+    if value is None or isinstance(value, (str, bool)):
+        return value[:1000] if isinstance(value, str) else value
+    if isinstance(value, int):
+        return value if value.bit_length() <= 4096 else _TRACE_UNSAFE
+    if isinstance(value, float):
+        return value if math.isfinite(value) else _TRACE_UNSAFE
+    if isinstance(value, (list, tuple)) and len(value) <= 50:
+        converted = [_trace_value(item, depth + 1) for item in value]
+        return converted if all(item is not _TRACE_UNSAFE for item in converted) else _TRACE_UNSAFE
+    return _TRACE_UNSAFE
+
+def _value_source(value):
+    if value is None:
+        return None
+    for previous, execution_id in reversed(_tracked_results):
+        if previous is value:
+            return execution_id
+    return None
+
+def _tracked_call(site_id, function, /, *args, **kwargs):
+    argument_sources = [_value_source(argument) for argument in args]
+    safe_arguments = [_trace_value(argument) for argument in args]
+    safe_arguments = [None if value is _TRACE_UNSAFE else value for value in safe_arguments]
+    result = function(*args, **kwargs)
+    if len(_analysis["executedCalls"]) >= 2500:
+        return result
+
+    execution_id = len(_analysis["executedCalls"])
+    try:
+        name = getattr(function, "__name__", None)
+    except BaseException:
+        name = None
+    try:
+        module = getattr(function, "__module__", None)
+    except BaseException:
+        module = None
+    event = {
+        "id": execution_id,
+        "site": site_id,
+        "name": name[:120] if isinstance(name, str) else None,
+        "module": module[:120] if isinstance(module, str) else None,
+        "arguments": safe_arguments[:20],
+        "argumentSources": argument_sources[:20],
+        "resultSource": _value_source(result),
+    }
+    _analysis["executedCalls"].append(event)
+    if result is not None and _trace_value(result) is not _TRACE_UNSAFE:
+        _tracked_results.append((result, execution_id))
+    return result
+
+class _TrackCalls(ast.NodeTransformer):
+    def __init__(self, call_ids):
+        self.call_ids = call_ids
+
+    def visit_Call(self, node):
+        self.generic_visit(node)
+        tracked = ast.Call(
+            func=ast.Name(id="_tracked_call", ctx=ast.Load()),
+            args=[ast.Constant(value=self.call_ids[node]), node.func, *node.args],
+            keywords=node.keywords,
+        )
+        return ast.copy_location(tracked, node)
+
 try:
     _tree = ast.parse(_STUDENT_CODE, filename="lesson.py")
     _syntax_names = sorted(set(type(_node).__name__ for _node in ast.walk(_tree)))
+    _call_nodes = [node for node in ast.walk(_tree) if isinstance(node, ast.Call)]
+    _call_ids = {node: index for index, node in enumerate(_call_nodes)}
+    _parents = {
+        child: parent
+        for parent in ast.walk(_tree)
+        for child in ast.iter_child_nodes(parent)
+    }
     _analysis["calls"] = [
         _call_name(_node.func)
-        for _node in ast.walk(_tree)
-        if isinstance(_node, ast.Call) and _call_name(_node.func) is not None
+        for _node in _call_nodes
+        if _call_name(_node.func) is not None
     ][:500]
+    for _call in _call_nodes[:500]:
+        _name = _call_name(_call.func)
+        if _name is None:
+            continue
+        _scope = None
+        _parent = _parents.get(_call)
+        while _parent is not None:
+            if isinstance(_parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                _scope = _parent.name[:120]
+                break
+            _parent = _parents.get(_parent)
+        _assigned_names = []
+        _parent = _parents.get(_call)
+        if isinstance(_parent, ast.Assign) and _parent.value is _call:
+            _assigned_names = [
+                node.id[:120]
+                for target in _parent.targets
+                for node in ast.walk(target)
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+            ][:20]
+        elif isinstance(_parent, ast.AnnAssign) and _parent.value is _call:
+            _assigned_names = [
+                node.id[:120]
+                for node in ast.walk(_parent.target)
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+            ][:20]
+        elif isinstance(_parent, ast.NamedExpr) and _parent.value is _call:
+            _assigned_names = [
+                node.id[:120]
+                for node in ast.walk(_parent.target)
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+            ][:20]
+        _analysis["callSites"].append({
+            "id": _call_ids[_call],
+            "name": _name[:120],
+            "scope": _scope,
+            "assignedNames": _assigned_names,
+            "argumentNames": [
+                sorted({
+                    node.id[:120]
+                    for node in ast.walk(argument)
+                    if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                })[:20]
+                for argument in _call.args[:20]
+            ],
+            "argumentCalls": [
+                _call_ids.get(argument) if isinstance(argument, ast.Call) else None
+                for argument in _call.args[:20]
+            ],
+        })
     for _loop in (node for node in ast.walk(_tree) if isinstance(node, ast.For)):
         _iterator = _call_name(_loop.iter.func) if isinstance(_loop.iter, ast.Call) else None
         _arguments = (
@@ -431,11 +562,15 @@ try:
             "parameters": [argument.arg[:120] for argument in _function.args.args][:20],
             "calls": _body_calls[:100],
         })
+    _tree = _TrackCalls(_call_ids).visit(_tree)
+    ast.fix_missing_locations(_tree)
+    _student_globals["_tracked_call"] = _tracked_call
     with contextlib.redirect_stdout(_stdout), contextlib.redirect_stderr(_stdout):
         exec(compile(_tree, "lesson.py", "exec"), _student_globals)
 except BaseException:
     _error = traceback.format_exc()[:_ERROR_LIMIT]
 
+_student_globals.pop("_tracked_call", None)
 _safe_globals = {}
 _function_names = []
 _module_names = []
@@ -470,7 +605,7 @@ for _key, _value in _student_globals.items():
         continue
     if isinstance(_value, types.ModuleType):
         if len(_module_names) < 200:
-            _module_names.append(_key[:120])
+            _module_names.append(_value.__name__[:120])
     elif callable(_value):
         if len(_function_names) < 200:
             _function_names.append(_key[:120])

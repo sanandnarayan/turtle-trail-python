@@ -3050,9 +3050,10 @@ const formatClockPart = (value: number | null) =>
 const hasCompletedTurtleCourse = (value: unknown) => {
   if (!isRecord(value)) return false;
   const progress = isRecord(value.progress) ? value.progress : value;
+  const completed = progress.completed;
   return (
-    Array.isArray(progress.completed) &&
-    TURTLE_COMPLETION_IDS.every((id) => progress.completed.includes(id))
+    Array.isArray(completed) &&
+    TURTLE_COMPLETION_IDS.every((id) => completed.includes(id))
   );
 };
 
