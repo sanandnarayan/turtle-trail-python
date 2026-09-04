@@ -331,6 +331,7 @@ const errorResult = (id, error) => ({
   functions: [],
   modules: [],
   syntax: [],
+  analysis: { calls: [], forLoops: [], functionDefs: [] },
   state: { x: 0, y: 0, heading: 0, color: "#173f5f", width: 4 },
 });
 
@@ -357,14 +358,79 @@ self.onmessage = async (event) => {
     namespace.set("_STUDENT_CODE", source);
     const resultProxy = await pyodide.runPythonAsync(String.raw`
 _reset_turtle()
-_student_globals = {"__name__": "__main__", "__file__": "lesson.py"}
+_student_globals = {
+    "__name__": "__main__",
+    "__file__": "lesson.py",
+    # Beginner lessons may use the familiar command form forward(50) directly.
+    "forward": forward,
+    "right": right,
+}
 _stdout = _LimitedWriter(_OUTPUT_LIMIT)
 _error = None
 _syntax_names = []
+_analysis = {"calls": [], "forLoops": [], "functionDefs": []}
+
+def _call_name(node):
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        owner = _call_name(node.value)
+        return f"{owner}.{node.attr}" if owner else node.attr
+    return None
+
+def _literal_value(node):
+    if not isinstance(node, ast.Constant) or isinstance(node.value, bool):
+        return None
+    if isinstance(node.value, int):
+        return node.value if abs(node.value) <= 9007199254740991 else None
+    if isinstance(node.value, float):
+        return node.value if math.isfinite(node.value) else None
+    if isinstance(node.value, str):
+        return node.value[:120]
+    return None
 
 try:
     _tree = ast.parse(_STUDENT_CODE, filename="lesson.py")
     _syntax_names = sorted(set(type(_node).__name__ for _node in ast.walk(_tree)))
+    _analysis["calls"] = [
+        _call_name(_node.func)
+        for _node in ast.walk(_tree)
+        if isinstance(_node, ast.Call) and _call_name(_node.func) is not None
+    ][:500]
+    for _loop in (node for node in ast.walk(_tree) if isinstance(node, ast.For)):
+        _iterator = _call_name(_loop.iter.func) if isinstance(_loop.iter, ast.Call) else None
+        _arguments = (
+            [_literal_value(argument) for argument in _loop.iter.args]
+            if isinstance(_loop.iter, ast.Call)
+            else []
+        )
+        _body_calls = []
+        for _statement in _loop.body:
+            for _node in ast.walk(_statement):
+                if isinstance(_node, ast.Call):
+                    _name = _call_name(_node.func)
+                    if _name is not None:
+                        _body_calls.append(_name)
+        _analysis["forLoops"].append({
+            "target": _loop.target.id if isinstance(_loop.target, ast.Name) else None,
+            "iterator": _iterator,
+            "iterable": _iterator if _iterator is not None else _call_name(_loop.iter),
+            "arguments": _arguments[:10],
+            "calls": _body_calls[:100],
+        })
+    for _function in (node for node in ast.walk(_tree) if isinstance(node, ast.FunctionDef)):
+        _body_calls = []
+        for _statement in _function.body:
+            for _node in ast.walk(_statement):
+                if isinstance(_node, ast.Call):
+                    _name = _call_name(_node.func)
+                    if _name is not None:
+                        _body_calls.append(_name)
+        _analysis["functionDefs"].append({
+            "name": _function.name[:120],
+            "parameters": [argument.arg[:120] for argument in _function.args.args][:20],
+            "calls": _body_calls[:100],
+        })
     with contextlib.redirect_stdout(_stdout), contextlib.redirect_stderr(_stdout):
         exec(compile(_tree, "lesson.py", "exec"), _student_globals)
 except BaseException:
@@ -421,6 +487,7 @@ json.dumps({
     "functions": _function_names,
     "modules": _module_names,
     "syntax": _syntax_names[:200],
+    "analysis": _analysis,
     "state": {
         "x": _TURTLE_STATE["x"],
         "y": _TURTLE_STATE["y"],

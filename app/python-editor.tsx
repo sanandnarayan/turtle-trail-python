@@ -119,6 +119,7 @@ export function PythonEditor({
   onChange,
   onKeyDown,
   disabled,
+  readOnly = false,
   ariaLabel,
   ariaDescribedBy,
   className = "",
@@ -127,6 +128,7 @@ export function PythonEditor({
   onChange: (value: string) => void;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
   disabled: boolean;
+  readOnly?: boolean;
   ariaLabel: string;
   ariaDescribedBy: string;
   className?: string;
@@ -168,6 +170,7 @@ export function PythonEditor({
           onKeyDown={onKeyDown}
           onScroll={syncScroll}
           disabled={disabled}
+          readOnly={readOnly}
           maxLength={20000}
           spellCheck={false}
           autoCapitalize="off"

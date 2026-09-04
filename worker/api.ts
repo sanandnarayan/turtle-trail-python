@@ -3,6 +3,7 @@ const MAGIC_LINK_COOKIE = "turtle_magic";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const MAGIC_LINK_TTL_MS = 15 * 60 * 1000;
 const MAX_JSON_BYTES = 600_000;
+const MAX_PROGRESS_ENTRIES = 150;
 const COURSE_KEYS = new Set(["turtle-basics", "clock-quest"]);
 
 type DatabaseRunResult = {
@@ -418,17 +419,17 @@ const normalizedProgress = (value: unknown) => {
   if (!isRecord(value)) throw new ApiError(400, "Progress must be an object.");
   if (
     !Array.isArray(value.completed) ||
-    value.completed.length > 50 ||
+    value.completed.length > MAX_PROGRESS_ENTRIES ||
     !value.completed.every(isProgressId) ||
     !Number.isInteger(value.unlocked) ||
     (value.unlocked as number) < 0 ||
-    (value.unlocked as number) > 100 ||
+    (value.unlocked as number) > MAX_PROGRESS_ENTRIES ||
     !Number.isInteger(value.current) ||
     (value.current as number) < 0 ||
-    (value.current as number) > 100 ||
+    (value.current as number) > MAX_PROGRESS_ENTRIES ||
     (value.current as number) > (value.unlocked as number) ||
     !isRecord(value.drafts) ||
-    Object.keys(value.drafts).length > 50
+    Object.keys(value.drafts).length > MAX_PROGRESS_ENTRIES
   ) {
     throw new ApiError(400, "Progress has an invalid shape.");
   }
