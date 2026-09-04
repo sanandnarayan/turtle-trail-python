@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CourseVictory } from "@/components/course-victory";
 import { Progress } from "@/components/ui/progress";
+import { sanitizePythonError } from "@/lib/python-error";
 
 import {
   AccountControl,
@@ -199,12 +200,14 @@ type PendingRun = {
 type SavedProgress = CourseProgress & {
   variants: Record<string, number>;
   revealed: string[];
+  answers: Record<string, string>;
 };
 
 const INDEPENDENT_LOOP_ID = "loop-independent";
 const TRANSFER_LOOP_ID = "loop-transfer";
 const BOSS_LOOP_ID = "loop-boss";
 const ANSWER_STATE_PREFIX = "answer-state-";
+const QUESTION_ANSWER_PREFIX = "question-answer-";
 const MASTERY_IDS: Record<string, [independent: string, transfer: string]> = {
   "4": [INDEPENDENT_LOOP_ID, TRANSFER_LOOP_ID],
   "5": ["variable-independent", "variable-transfer"],
@@ -3495,8 +3498,7 @@ export function TurtleCourse() {
   const awaitingFreshVariant = Boolean(
     variant &&
     variantIndex === 0 &&
-    revealedSet.has(lesson.id) &&
-    !completedSet.has(lesson.id),
+    revealedSet.has(lesson.id),
   );
   const quizReady = !lesson.question || currentAnswer !== null;
   const conceptMasteryComplete = Boolean(
@@ -3511,8 +3513,11 @@ export function TurtleCourse() {
     revealed.forEach((id) => {
       syncedDrafts[`${ANSWER_STATE_PREFIX}${id}`] = variants[id] === 1 ? "fresh" : "revealed";
     });
+    Object.entries(answers).forEach(([id, answer]) => {
+      syncedDrafts[`${QUESTION_ANSWER_PREFIX}${id}`] = answer;
+    });
     return { completed, unlocked, current: currentIndex, drafts: syncedDrafts };
-  }, [completed, currentIndex, drafts, revealed, unlocked, variants]);
+  }, [answers, completed, currentIndex, drafts, revealed, unlocked, variants]);
   const mergeRemoteProgress = useCallback((remote: CourseProgress) => {
     const lessonIds = new Set(LESSONS.map((item) => item.id));
     const remoteCompleted = remote.completed.filter((id) => lessonIds.has(id));
@@ -3521,9 +3526,16 @@ export function TurtleCourse() {
     const remoteDrafts: Record<string, string> = {};
     const remoteRevealed: string[] = [];
     const remoteFreshVariants: string[] = [];
+    const remoteAnswers: Record<string, string> = {};
     Object.entries(remote.drafts).forEach(([id, draft]) => {
       if (lessonIds.has(id)) {
         remoteDrafts[id] = draft.slice(0, 20000);
+        return;
+      }
+      if (id.startsWith(QUESTION_ANSWER_PREFIX)) {
+        const lessonId = id.slice(QUESTION_ANSWER_PREFIX.length);
+        const question = LESSONS.find((item) => item.id === lessonId)?.question;
+        if (question?.choices.some(([value]) => value === draft)) remoteAnswers[lessonId] = draft;
         return;
       }
       if (!id.startsWith(ANSWER_STATE_PREFIX)) return;
@@ -3538,6 +3550,7 @@ export function TurtleCourse() {
     });
     setCurrentIndex((previous) => Math.max(previous, remoteCurrent));
     setDrafts((previous) => ({ ...remoteDrafts, ...previous }));
+    setAnswers((previous) => ({ ...remoteAnswers, ...previous }));
     setRevealed((previous) => [...new Set([...remoteRevealed, ...previous])]);
     setVariants((previous) => {
       const merged = { ...previous };
@@ -3681,11 +3694,21 @@ export function TurtleCourse() {
                 (id): id is string => typeof id === "string" && lessonIds.has(id),
               ))]
             : [];
+          const restoredAnswers: Record<string, string> = {};
+          if (isRecord(progressData.answers)) {
+            Object.entries(progressData.answers).forEach(([id, answer]) => {
+              const question = LESSONS.find((item) => item.id === id)?.question;
+              if (typeof answer === "string" && question?.choices.some(([value]) => value === answer)) {
+                restoredAnswers[id] = answer;
+              }
+            });
+          }
           setCompleted(restoredCompleted);
           setCurrentIndex(restoredCurrent);
           setDrafts(restoredDrafts);
           setVariants(restoredVariants);
           setRevealed(restoredRevealed);
+          setAnswers(restoredAnswers);
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
@@ -3710,13 +3733,14 @@ export function TurtleCourse() {
       drafts,
       variants,
       revealed,
+      answers,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
     } catch {
       // Learning still works when storage is unavailable; only persistence is skipped.
     }
-  }, [completed, currentIndex, drafts, hydrated, revealed, unlocked, variants]);
+  }, [answers, completed, currentIndex, drafts, hydrated, revealed, unlocked, variants]);
 
   useEffect(() => {
     if (!hydrated || sessionStatus === "loading" || user || currentIndex === 0) return;
@@ -3832,7 +3856,7 @@ export function TurtleCourse() {
 
   const revealHint = () => setVisibleHints((count) => Math.min(lesson.hints.length, count + 1));
   const revealAnswer = () => {
-    if (!variant || revealedSet.has(lesson.id) || completedSet.has(lesson.id)) return;
+    if (!variant || revealedSet.has(lesson.id)) return;
     setRevealed((previous) => previous.includes(lesson.id) ? previous : [...previous, lesson.id]);
     setFeedback(null);
   };
@@ -4038,7 +4062,7 @@ export function TurtleCourse() {
                   aria-live={result.error ? "assertive" : "polite"}
                 >
                   <div className="terminal-label"><Terminal /> {result.error ? "Python message" : "Printed output"}</div>
-                  <pre>{result.error ?? result.output}</pre>
+                  <pre>{sanitizePythonError(result.error) ?? result.output}</pre>
                 </div>
               )}
             </section>

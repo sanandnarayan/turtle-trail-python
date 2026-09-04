@@ -539,7 +539,7 @@ textarea {
   position: relative;
   overflow: hidden;
   border-right: 1px solid #e6ece8;
-  color: #9aa59f;
+  color: #66736c;
   font-family: var(--font-mono);
   font-size: 0.87rem;
   line-height: 1.65;
@@ -1108,6 +1108,13 @@ textarea {
 .account-button.signed-in:hover {
   border-color: var(--green);
   background: #d4f9e1;
+}
+
+.account-button.signed-in.sync-error,
+.account-button.signed-in.sync-error:hover {
+  border-color: #e3aaa5;
+  color: #7d3437;
+  background: #fbe0dc;
 }
 
 .account-dialog-backdrop {

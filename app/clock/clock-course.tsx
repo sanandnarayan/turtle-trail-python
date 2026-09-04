@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CourseVictory } from "@/components/course-victory";
 import { Progress } from "@/components/ui/progress";
+import { sanitizePythonError } from "@/lib/python-error";
 
 import {
   AccountControl,
@@ -2884,6 +2885,7 @@ const isRunResultMessage = (
 type SavedProgress = CourseProgress & {
   variants: Record<string, number>;
   revealed: string[];
+  answers: Record<string, string>;
 };
 
 type PendingRun = {
@@ -2897,6 +2899,7 @@ type PendingRun = {
 const STORAGE_KEY = "turtle-clock-quest-progress-v1";
 const TURTLE_STORAGE_KEY = "turtle-trail-progress-v1";
 const CLOCK_ANSWER_STATE_PREFIX = "clock-answer-state-";
+const CLOCK_QUESTION_ANSWER_PREFIX = "clock-question-answer-";
 const CLOCK_MASTERY_IDS: Record<string, [independent: string, transfer: string]> = {
   "1": ["face-independent", "face-transfer"],
   "2": ["numbers-independent", "numbers-transfer"],
@@ -3201,8 +3204,7 @@ function ClockWorkshop() {
   const awaitingFreshVariant = Boolean(
     variant &&
     variantIndex === 0 &&
-    revealedSet.has(lesson.id) &&
-    !completedSet.has(lesson.id),
+    revealedSet.has(lesson.id),
   );
   const quizReady = !lesson.question || currentAnswer !== null;
   const conceptMasteryComplete = Boolean(
@@ -3222,8 +3224,11 @@ function ClockWorkshop() {
     revealed.forEach((id) => {
       syncedDrafts[`${CLOCK_ANSWER_STATE_PREFIX}${id}`] = variants[id] === 1 ? "fresh" : "revealed";
     });
+    Object.entries(answers).forEach(([id, answer]) => {
+      syncedDrafts[`${CLOCK_QUESTION_ANSWER_PREFIX}${id}`] = answer;
+    });
     return { completed, unlocked, current: currentIndex, drafts: syncedDrafts };
-  }, [completed, currentIndex, drafts, revealed, unlocked, variants]);
+  }, [answers, completed, currentIndex, drafts, revealed, unlocked, variants]);
   const mergeRemoteProgress = useCallback((remote: CourseProgress) => {
     const lessonIds = new Set(CLOCK_LESSONS.map((item) => item.id));
     const remoteCompleted = remote.completed.filter((id) => lessonIds.has(id));
@@ -3232,9 +3237,16 @@ function ClockWorkshop() {
     const remoteDrafts: Record<string, string> = {};
     const remoteRevealed: string[] = [];
     const remoteFreshVariants: string[] = [];
+    const remoteAnswers: Record<string, string> = {};
     Object.entries(remote.drafts).forEach(([id, draft]) => {
       if (lessonIds.has(id)) {
         remoteDrafts[id] = draft.slice(0, 20000);
+        return;
+      }
+      if (id.startsWith(CLOCK_QUESTION_ANSWER_PREFIX)) {
+        const lessonId = id.slice(CLOCK_QUESTION_ANSWER_PREFIX.length);
+        const question = CLOCK_LESSONS.find((item) => item.id === lessonId)?.question;
+        if (question?.choices.some(([value]) => value === draft)) remoteAnswers[lessonId] = draft;
         return;
       }
       if (!id.startsWith(CLOCK_ANSWER_STATE_PREFIX)) return;
@@ -3249,6 +3261,7 @@ function ClockWorkshop() {
     });
     setCurrentIndex((previous) => Math.max(previous, remoteCurrent));
     setDrafts((previous) => ({ ...remoteDrafts, ...previous }));
+    setAnswers((previous) => ({ ...remoteAnswers, ...previous }));
     setRevealed((previous) => [...new Set([...remoteRevealed, ...previous])]);
     setVariants((previous) => {
       const merged = { ...previous };
@@ -3399,11 +3412,21 @@ function ClockWorkshop() {
                 (id): id is string => typeof id === "string" && lessonIds.has(id),
               ))]
             : [];
+          const restoredAnswers: Record<string, string> = {};
+          if (isRecord(progressData.answers)) {
+            Object.entries(progressData.answers).forEach(([id, answer]) => {
+              const question = CLOCK_LESSONS.find((item) => item.id === id)?.question;
+              if (typeof answer === "string" && question?.choices.some(([value]) => value === answer)) {
+                restoredAnswers[id] = answer;
+              }
+            });
+          }
           setCompleted(restoredCompleted);
           setCurrentIndex(restoredCurrent);
           setDrafts(restoredDrafts);
           setVariants(restoredVariants);
           setRevealed(restoredRevealed);
+          setAnswers(restoredAnswers);
         }
       } catch {
         localStorage.removeItem(STORAGE_KEY);
@@ -3428,13 +3451,14 @@ function ClockWorkshop() {
       drafts,
       variants,
       revealed,
+      answers,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(progressData));
     } catch {
       // The course still works when storage is unavailable; only persistence is skipped.
     }
-  }, [completed, currentIndex, drafts, hydrated, revealed, unlocked, variants]);
+  }, [answers, completed, currentIndex, drafts, hydrated, revealed, unlocked, variants]);
 
   useEffect(() => {
     const list = lessonListRef.current;
@@ -3571,7 +3595,7 @@ function ClockWorkshop() {
 
   const revealHint = () => setVisibleHints((count) => Math.min(lesson.hints.length, count + 1));
   const revealAnswer = () => {
-    if (!variant || revealedSet.has(lesson.id) || completedSet.has(lesson.id)) return;
+    if (!variant || revealedSet.has(lesson.id)) return;
     setRevealed((previous) => previous.includes(lesson.id) ? previous : [...previous, lesson.id]);
     setFeedback(null);
   };
@@ -3758,7 +3782,7 @@ function ClockWorkshop() {
               {(result?.error || (lesson.output !== "print" && result?.output)) && (
                 <div className={`terminal-output ${result.error ? "has-error" : ""}`} role={result.error ? "alert" : "status"}>
                   <div className="terminal-label"><Terminal /> {result.error ? "Python message" : "Printed output"}</div>
-                  <pre>{result.error ?? result.output}</pre>
+                  <pre>{sanitizePythonError(result.error) ?? result.output}</pre>
                 </div>
               )}
             </section>

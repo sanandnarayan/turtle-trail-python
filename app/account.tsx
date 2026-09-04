@@ -146,6 +146,14 @@ const syncCopy: Record<ProgressSyncStatus, string> = {
   error: "Cloud sync paused",
 };
 
+const syncBadgeCopy: Record<ProgressSyncStatus, string> = {
+  local: "Autosave on",
+  loading: "Loading…",
+  saving: "Saving…",
+  saved: "Synced",
+  error: "Sync paused",
+};
+
 const SyncIcon = ({ status }: { status: ProgressSyncStatus }) => {
   if (status === "loading" || status === "saving") {
     return <LoaderCircle className="account-spinner" aria-hidden="true" />;
@@ -257,13 +265,13 @@ export function AccountControl({
       <button
         ref={triggerRef}
         type="button"
-        className={`course-link account-button ${user ? "signed-in" : ""}`}
+        className={`course-link account-button ${user ? `signed-in sync-${syncStatus}` : ""}`}
         onClick={() => setOpen(true)}
         disabled={sessionStatus === "loading"}
         aria-label={user ? `Account for ${user.email}. ${syncCopy[syncStatus]}` : celebrateFirstLesson ? "Sign in to continue to lesson 2" : "Progress is autosaved on this device. Sign in for cloud sync"}
       >
-        {user ? <Cloud aria-hidden="true" /> : <Save aria-hidden="true" />}
-        <span>{sessionStatus === "loading" ? "Checking…" : user ? "Synced" : celebrateFirstLesson ? "Sign in to continue" : "Autosave on"}</span>
+        {user ? <SyncIcon status={syncStatus} /> : <Save aria-hidden="true" />}
+        <span>{sessionStatus === "loading" ? "Checking…" : user ? syncBadgeCopy[syncStatus] : celebrateFirstLesson ? "Sign in to continue" : "Autosave on"}</span>
       </button>
 
       {open && createPortal(
@@ -371,8 +379,15 @@ export function useCourseProgressSync({
   const { user, sessionStatus, refreshSession } = useAccount();
   const [syncStatus, setSyncStatus] = useState<ProgressSyncStatus>("local");
   const [readyUserId, setReadyUserId] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const userId = user?.id ?? null;
   const serializedProgress = useMemo(() => JSON.stringify(progress), [progress]);
+
+  useEffect(() => {
+    const retryWhenOnline = () => setRetryToken((token) => token + 1);
+    window.addEventListener("online", retryWhenOnline);
+    return () => window.removeEventListener("online", retryWhenOnline);
+  }, []);
 
   useEffect(() => {
     if (!hydrated || sessionStatus === "loading") return;
@@ -389,6 +404,7 @@ export function useCourseProgressSync({
       signal: controller.signal,
     })
       .then(async (response) => {
+        window.clearTimeout(loadingTimer);
         if (response.status === 401) {
           await refreshSession();
           throw new Error("Session expired");
@@ -402,6 +418,7 @@ export function useCourseProgressSync({
         setSyncStatus("saving");
       })
       .catch((loadError: unknown) => {
+        window.clearTimeout(loadingTimer);
         if (loadError instanceof DOMException && loadError.name === "AbortError") return;
         setSyncStatus("error");
       });
@@ -409,7 +426,7 @@ export function useCourseProgressSync({
       window.clearTimeout(loadingTimer);
       controller.abort();
     };
-  }, [course, hydrated, mergeRemoteProgress, refreshSession, sessionStatus, userId]);
+  }, [course, hydrated, mergeRemoteProgress, refreshSession, retryToken, sessionStatus, userId]);
 
   useEffect(() => {
     if (!hydrated || !userId || readyUserId !== userId) return;
@@ -438,7 +455,7 @@ export function useCourseProgressSync({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [course, hydrated, readyUserId, refreshSession, serializedProgress, userId]);
+  }, [course, hydrated, readyUserId, refreshSession, retryToken, serializedProgress, userId]);
 
   if (!userId) return sessionStatus === "error" ? "error" : "local";
   return syncStatus;
